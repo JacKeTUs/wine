@@ -2798,18 +2798,117 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateTransformedImageSource
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSpriteBatch(ID2D1DeviceContext6 *iface,
         ID2D1SpriteBatch **sprite_batch)
 {
-    FIXME("iface %p, sprite_batch %p stub!\n", iface, sprite_batch);
+    TRACE("iface %p, sprite_batch %p\n", iface, sprite_batch);
 
-    return E_NOTIMPL;
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    struct d2d_sprite_batch *object;
+    HRESULT hr;
+
+    if (SUCCEEDED(hr = d2d_sprite_batch_create(context->factory, &object)))
+        *sprite_batch = &object->ID2D1SpriteBatch_iface;
+
+    return hr;
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceContext6 *iface,
         ID2D1SpriteBatch *sprite_batch, UINT32 start_index, UINT32 sprite_count, ID2D1Bitmap *bitmap,
         D2D1_BITMAP_INTERPOLATION_MODE interpolation_mode, D2D1_SPRITE_OPTIONS sprite_options)
 {
-    FIXME("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
-            "sprite_options %u stub!\n", iface, sprite_batch, start_index, sprite_count, bitmap,
+    TRACE("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
+            "sprite_options %u\n", iface, sprite_batch, start_index, sprite_count, bitmap,
             interpolation_mode, sprite_options);
+    
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
+    TRACE("context %p, batch %p\n", context, batch);
+    
+    if (!batch || !bitmap) return;
+    
+    TRACE("Sprite count is %d.\n", sprite_count);
+    TRACE("Sprite count in batch is %d.\n", batch->sprite_count);
+
+    if (start_index >= batch->sprite_count)
+        return;
+
+    TRACE("Drawing %u sprites from batch.\n", sprite_count);
+
+    /* Save the current transform */
+    D2D1_MATRIX_3X2_F original_transform;
+    d2d_device_context_GetTransform(iface, &original_transform);
+
+    /* Iterate over the sprites */
+    for (UINT32 idx = start_index; idx < min(sprite_count, batch->sprite_count); idx++)
+    {
+        TRACE("Drawing %u sprite from batch.\n", idx);
+        /* Prepare the transform */
+        D2D1_MATRIX_3X2_F transform = identity;
+
+        D2D1_RECT_F *dst = NULL;
+
+        if (batch->destinationRects)
+        {
+            dst = &batch->destinationRects[idx];
+
+            /* Translate to the destination position */
+            D2D1_MATRIX_3X2_F translate = {{{
+                                                1.0f, 0.0f,
+                                                0.0f, 1.0f,
+                                                0.0f, 0.0f,
+                                            }}};
+
+            /* Scale to match the destination size */
+            FLOAT width = dst->right - dst->left;
+            FLOAT height = dst->bottom - dst->top;
+            D2D1_MATRIX_3X2_F scale = {{{
+                                            width, 0.0f,
+                                            0.0f, height, 
+                                            0.0f, 0.0f,
+                                        }}};
+
+            /* Apply translation and scaling */
+            d2d_matrix_multiply(&transform, &scale);
+            d2d_matrix_multiply(&transform, &translate);
+        }
+
+        /* Apply sprite-specific transform if provided */
+        if (batch->transforms)
+        {
+            /* Multiply transform with sprite-specific transform */
+            d2d_matrix_multiply(&transform, &batch->transforms[idx]);
+        }
+
+        /* Determine the source rectangle */
+        const D2D1_RECT_F *src_rect = batch->sourceRects ? (D2D1_RECT_F*)&batch->sourceRects[idx] : NULL;
+
+        /* Handle sprite options (e.g., flipping) */
+        if (sprite_options & D2D1_SPRITE_OPTIONS_CLAMP_TO_SOURCE_RECTANGLE)
+        {
+            /* Ensure source rect is not NULL */
+            if (!src_rect) {
+                WARN("Whole source rect is NULL\n");
+                continue;
+            }
+                
+        }
+
+        /* Determine the opacity from the sprite color */
+        FLOAT opacity = 1.0f;
+        if (batch->colors) {
+            opacity = batch->colors[idx].a;
+            TRACE("opacity %f\n", opacity);
+        } 
+            
+
+        /* Set the transform */
+        d2d_device_context_SetTransform(iface, &transform);
+
+        /* Draw the bitmap into sprite */
+        d2d_device_context_DrawBitmap(iface, bitmap, dst, opacity, interpolation_mode, src_rect);
+
+        /* Restore the original transform */
+        d2d_device_context_SetTransform(iface, &original_transform);
+    }
+
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSvgGlyphStyle(ID2D1DeviceContext6 *iface,
