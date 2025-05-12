@@ -773,3 +773,14 @@ struct d2d_bitmap *unsafe_impl_from_ID2D1Bitmap(ID2D1Bitmap *iface)
     assert(iface->lpVtbl == (ID2D1BitmapVtbl *)&d2d_bitmap_vtbl);
     return CONTAINING_RECORD(iface, struct d2d_bitmap, ID2D1Bitmap1_iface);
 }
+
+void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, const struct d2d_device_context *context,
+        const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer)
+{
+    FIXME("stub!\n");
+}
+
+void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap)
+{
+    FIXME("stub!\n");
+}

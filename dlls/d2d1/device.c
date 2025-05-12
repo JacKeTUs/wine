@@ -1728,14 +1728,15 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
 
     FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
-    {
-        D2D1_LAYER_PARAMETERS1 parameters;
+    D2D1_LAYER_PARAMETERS1 parameters;
+    memcpy(&parameters, layer_parameters, sizeof(*layer_parameters));
+    parameters.layerOptions = D2D1_LAYER_OPTIONS1_NONE;
 
-        memcpy(&parameters, layer_parameters, sizeof(*layer_parameters));
-        parameters.layerOptions = D2D1_LAYER_OPTIONS1_NONE;
+    if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_push_layer(context->target.command_list, context, &parameters, layer);
-    }
+
+    if (context->target.type == D2D_TARGET_BITMAP)
+        d2d_bitmap_push_layer(context->target.bitmap, context, &parameters, layer);
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
@@ -1746,6 +1747,9 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_pop_layer(context->target.command_list);
+
+    if (context->target.type == D2D_TARGET_BITMAP)
+        d2d_bitmap_pop_layer(context->target.bitmap);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_Flush(ID2D1DeviceContext6 *iface, D2D1_TAG *tag1, D2D1_TAG *tag2)
@@ -2622,6 +2626,10 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
+
+    
+    if (context->target.type == D2D_TARGET_BITMAP)
+        d2d_bitmap_push_layer(context->target.bitmap, context, &parameters, layer);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_InvalidateEffectInputRectangle(ID2D1DeviceContext6 *iface,
