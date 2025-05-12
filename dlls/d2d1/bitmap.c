@@ -854,7 +854,7 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
     };
 
     ID2D1DeviceContext_DrawBitmap(context_iface, entry->target, &rect,
-            entry->params.opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, NULL);
+            entry->params.opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, NULL, NULL);
 
     ID2D1Bitmap1_Release(entry->target);
     ID2D1Layer_Release(entry->layer);
