@@ -774,13 +774,81 @@ struct d2d_bitmap *unsafe_impl_from_ID2D1Bitmap(ID2D1Bitmap *iface)
     return CONTAINING_RECORD(iface, struct d2d_bitmap, ID2D1Bitmap1_iface);
 }
 
-void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, const struct d2d_device_context *context,
+void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context,
         const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer)
 {
-    FIXME("stub!\n");
+    struct d2d_layer_entry entry;
+    D2D1_SIZE_U size = {bitmap->width, bitmap->height};
+    D2D1_BITMAP_PROPERTIES1 props = {
+        .pixelFormat.format = bitmap->format,
+        .pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED,
+        .dpiX = bitmap->dpi_x,
+        .dpiY = bitmap->dpi_y,
+        .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+    };
+
+    TRACE("bitmap %p, context %p, params %p, layer %p.\n", bitmap, context, params, layer);
+
+    HRESULT hr = ID2D1RenderTarget_CreateBitmap((ID2D1RenderTarget *)context->dxgi_target,
+            size, NULL, 0, (const D2D1_BITMAP_PROPERTIES *)&props, &entry.target);
+    if (FAILED(hr))
+    {
+        ERR("Failed to create layer bitmap, hr %#x.\n", hr);
+        context->error = hr;
+        return;
+    }
+
+    entry.params = *params;
+    entry.layer = layer;
+    ID2D1Layer_AddRef(layer);
+
+    if (context->layer_stack.count == context->layer_stack.size)
+    {
+        size_t new_size = max(4, context->layer_stack.size * 2);
+        struct d2d_layer_entry *new_entries = realloc(context->layer_stack.entries, new_size * sizeof(*new_entries));
+        if (!new_entries)
+        {
+            context->error = E_OUTOFMEMORY;
+            ERR("Out of memory when creating new layer entry\n");
+            ID2D1Bitmap_Release(entry.target);
+            ID2D1Layer_Release(layer);
+            return;
+        }
+
+        context->layer_stack.entries = new_entries;
+        context->layer_stack.size = new_size;
+    }
+
+    context->layer_stack.entries[context->layer_stack.count++] = entry;
+
+    ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)entry.target);
 }
 
-void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap)
+void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context)
 {
-    FIXME("stub!\n");
+    TRACE("bitmap %p, context %p.\n", bitmap, context);
+
+    if (!context->layer_stack.count)
+    {
+        ERR("PopLayer called with empty stack.\n");
+        context->error = D2DERR_POP_CALL_DID_NOT_MATCH_PUSH;
+        return;
+    }
+
+    struct d2d_layer_entry *entry = &context->layer_stack.entries[--context->layer_stack.count];
+
+    ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)bitmap);
+
+    D2D1_RECT_F rect = {
+        .left = 0.0f,
+        .top = 0.0f,
+        .right = (FLOAT)bitmap->width,
+        .bottom = (FLOAT)bitmap->height,
+    };
+
+    ID2D1DeviceContext_DrawBitmap(&context->ID2D1DeviceContext6_iface, entry->target, &rect,
+            entry->params.opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, NULL);
+
+    ID2D1Bitmap_Release(entry->target);
+    ID2D1Layer_Release(entry->layer);
 }
