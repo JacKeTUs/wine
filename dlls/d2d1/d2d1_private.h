@@ -791,6 +791,7 @@ struct d2d_effect
     struct d2d_effect_context *effect_context;
     struct d2d_transform_graph *graph;
     ID2D1Image **inputs;
+    ID2D1Image *output;
     size_t inputs_size;
     size_t input_count;
 };

@@ -2571,24 +2571,6 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
     if (composite_mode != D2D1_COMPOSITE_MODE_SOURCE_OVER)
         FIXME("Unhandled composite mode %#x.\n", composite_mode);
 
-    if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Effect, (void **)&effect)))
-    {
-        TRACE("We got an effect as input parameter to DrawImage. Trying GetOuput\n");
-        ID2D1Effect_GetOutput(effect, &effect_image);
-
-        if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
-        {
-            TRACE("We got a bitmap from effect_image\n");
-            d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
-
-            ID2D1Bitmap_Release(bitmap);
-            ID2D1Image_Release(effect_image);
-            ID2D1Effect_Release(effect);
-            return;
-        } else {
-            TRACE("We didn't succeed in getting bitmap from effect_image\n");
-        }
-    }
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Bitmap, (void **)&bitmap)))
     {

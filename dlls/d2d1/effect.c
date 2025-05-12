@@ -1905,6 +1905,18 @@ static HRESULT STDMETHODCALLTYPE d2d_effect_QueryInterface(ID2D1Effect *iface, R
         return S_OK;
     }
 
+    // If IID_ID2D1Bitmap is queried, return first input as Bitmap. Very dirty hack. 
+    // d2d_effect structure should hold rendered bitmap and return it here?
+    if (IsEqualGUID(iid, &IID_ID2D1Bitmap1)
+            || IsEqualGUID(iid, &IID_ID2D1Bitmap))
+    {
+        if (effect->input_count > 0) {
+            HACK("Returning input[0] as bitmap output\n")
+            ID2D1Image *input_image = effect->inputs[0];
+            return ID2D1Image_QueryInterface(input_image, iid, out);
+        }
+    }
+
     WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
 
     *out = NULL;
@@ -2745,7 +2757,7 @@ HRESULT d2d_effect_create(struct d2d_device_context *context, const CLSID *effec
 
     *effect = &object->ID2D1Effect_iface;
 
-    TRACE("Created effect %p.\n", *effect);
+    TRACE("Created effect %s %p.\n", wine_dbgstr_guid(effect_id), *effect);
 
     return S_OK;
 }
