@@ -831,9 +831,8 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 
 void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context)
 {
-    TRACE("bitmap %p, context %p.\n", bitmap, context);
     ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
-
+    TRACE("bitmap %p, context %p.\n", bitmap, context);
 
     if (!context->layer_stack.count)
     {
