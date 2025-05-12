@@ -2557,8 +2557,6 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
         D2D1_COMPOSITE_MODE composite_mode)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
-    ID2D1Effect *effect;
-    ID2D1Image  *effect_image;
     ID2D1Bitmap *bitmap;
 
     TRACE("iface %p, image %p, target_offset %s, image_rect %s, interpolation_mode %#x, composite_mode %#x.\n",
@@ -2629,7 +2627,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 
     
     if (context->target.type == D2D_TARGET_BITMAP)
-        d2d_bitmap_push_layer(context->target.bitmap, context, &parameters, layer);
+        d2d_bitmap_push_layer(context->target.bitmap, context, layer_parameters, layer);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_InvalidateEffectInputRectangle(ID2D1DeviceContext6 *iface,
