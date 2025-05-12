@@ -798,7 +798,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
     if (FAILED(hr))
     {
         ERR("Failed to create layer bitmap, hr %#x.\n", hr);
-        d2d_device_context_set_error(context, D2DERR_INTERNAL_ERROR);
+        //d2d_device_context_set_error(context, D2DERR_INTERNAL_ERROR);
         return;
     }
 
@@ -812,7 +812,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
         struct d2d_layer_entry *new_entries = realloc(context->layer_stack.stack, new_size * sizeof(*new_entries));
         if (!new_entries)
         {
-            d2d_device_context_set_error(context, D2DERR_INTERNAL_ERROR);
+            //d2d_device_context_set_error(context, D2DERR_INTERNAL_ERROR);
             ERR("Out of memory when creating new layer entry\n");
             ID2D1Bitmap1_Release(entry.target);
             ID2D1Layer_Release(layer);
@@ -836,7 +836,7 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
     if (!context->layer_stack.count)
     {
         ERR("PopLayer called with empty stack.\n");
-        d2d_device_context_set_error(context, D2DERR_POP_CALL_DID_NOT_MATCH_PUSH);
+        //d2d_device_context_set_error(context, D2DERR_POP_CALL_DID_NOT_MATCH_PUSH);
         return;
     }
 
