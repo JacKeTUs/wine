@@ -2846,8 +2846,6 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     for (UINT32 idx = start_index; idx < end_index; idx++)
     {
         TRACE("Drawing %u sprite from batch.\n", idx);
-        /* Prepare the transform */
-        D2D1_MATRIX_3X2_F transform = identity;
 
         D2D1_RECT_F *dst = NULL;
 
