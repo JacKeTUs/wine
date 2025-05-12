@@ -778,7 +778,12 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
         const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer)
 {
     struct d2d_layer_entry entry;
-    D2D1_SIZE_U size = {bitmap->width, bitmap->height};
+    ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
+
+    D2D1_SIZE_U size;
+    size->width = bitmap->pixel_size.width / (bitmap->dpi_x / 96.0f);
+    size->height = bitmap->pixel_size.height / (bitmap->dpi_y / 96.0f);
+
     D2D1_BITMAP_PROPERTIES1 props = {
         .pixelFormat.format = bitmap->format,
         .pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED,
@@ -789,7 +794,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 
     TRACE("bitmap %p, context %p, params %p, layer %p.\n", bitmap, context, params, layer);
 
-    HRESULT hr = ID2D1RenderTarget_CreateBitmap((ID2D1RenderTarget *)context->dxgi_target,
+    HRESULT hr = ID2D1DeviceContext_CreateBitmap(context_iface, 
             size, NULL, 0, (const D2D1_BITMAP_PROPERTIES *)&props, &entry.target);
     if (FAILED(hr))
     {
@@ -827,6 +832,8 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context)
 {
     TRACE("bitmap %p, context %p.\n", bitmap, context);
+    ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
+
 
     if (!context->layer_stack.count)
     {
@@ -837,16 +844,16 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
 
     struct d2d_layer_entry *entry = &context->layer_stack.entries[--context->layer_stack.count];
 
-    ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)bitmap);
+    ID2D1DeviceContext_SetTarget(context_iface, (ID2D1Image *)bitmap);
 
     D2D1_RECT_F rect = {
         .left = 0.0f,
         .top = 0.0f,
-        .right = (FLOAT)bitmap->width,
-        .bottom = (FLOAT)bitmap->height,
+        .right = (FLOAT)bitmap->pixel_size.width  / (bitmap->dpi_x / 96.0f),
+        .bottom = (FLOAT)bitmap->pixel_size.height  / (bitmap->dpi_y / 96.0f),
     };
 
-    ID2D1DeviceContext_DrawBitmap(&context->ID2D1DeviceContext6_iface, entry->target, &rect,
+    ID2D1DeviceContext_DrawBitmap(context_iface, entry->target, &rect,
             entry->params.opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, NULL);
 
     ID2D1Bitmap_Release(entry->target);
