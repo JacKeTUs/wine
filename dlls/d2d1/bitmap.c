@@ -785,8 +785,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
     size.height = bitmap->pixel_size.height / (bitmap->dpi_y / 96.0f);
 
     D2D1_BITMAP_PROPERTIES1 props = {
-        .pixelFormat.format = bitmap->format,
-        .pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED,
+        .pixelFormat = bitmap->format,
         .dpiX = bitmap->dpi_x,
         .dpiY = bitmap->dpi_y,
         .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
@@ -824,7 +823,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
         context->layer_stack.size = new_size;
     }
 
-    context->layer_stack.entries[context->layer_stack.count++] = entry;
+    context->layer_stack.stack[context->layer_stack.count++] = entry;
 
     ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)entry.target);
 }
