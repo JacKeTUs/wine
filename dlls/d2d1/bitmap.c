@@ -781,8 +781,8 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, const struct d2d_device_co
     ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
 
     D2D1_SIZE_U size;
-    size->width = bitmap->pixel_size.width / (bitmap->dpi_x / 96.0f);
-    size->height = bitmap->pixel_size.height / (bitmap->dpi_y / 96.0f);
+    size.width = bitmap->pixel_size.width / (bitmap->dpi_x / 96.0f);
+    size.height = bitmap->pixel_size.height / (bitmap->dpi_y / 96.0f);
 
     D2D1_BITMAP_PROPERTIES1 props = {
         .pixelFormat.format = bitmap->format,
@@ -795,7 +795,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, const struct d2d_device_co
     TRACE("bitmap %p, context %p, params %p, layer %p.\n", bitmap, context, params, layer);
 
     HRESULT hr = ID2D1DeviceContext_CreateBitmap(context_iface, 
-            size, NULL, 0, (const D2D1_BITMAP_PROPERTIES *)&props, &entry.target);
+            size, NULL, 0, (const D2D1_BITMAP_PROPERTIES1 *)&props, &entry.target);
     if (FAILED(hr))
     {
         ERR("Failed to create layer bitmap, hr %#x.\n", hr);
