@@ -4670,10 +4670,9 @@ BOOL d2d_device_get_indexed_object(struct d2d_indexed_objects *objects, const GU
 
 static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
 {
-    stack->stack.entries = NULL;
-    stack->stack.size = 0;
-    stack->stack.count = 0;
-
+    stack->stack = NULL;
+    stack->size = 0;
+    stack->count = 0;
     return TRUE;
 }
 
