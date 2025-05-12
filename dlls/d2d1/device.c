@@ -2830,8 +2830,10 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     TRACE("Sprite count is %d.\n", sprite_count);
     TRACE("Sprite count in batch is %d.\n", batch->sprite_count);
 
-    if (start_index >= batch->sprite_count)
+    if (start_index >= batch->sprite_count) {
+        WARN("Start index %d is greater than batch->sprite_count %d\n", start_index, batch->sprite_count);
         return;
+    }
 
     TRACE("Drawing %u sprites from batch.\n", sprite_count);
 
@@ -2851,6 +2853,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
         if (batch->destinationRects)
         {
+            TRACE("Set dest rect idx %d\n", idx);
             dst = &batch->destinationRects[idx];
         }
 
@@ -2874,10 +2877,10 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
             TRACE("opacity %f\n", opacity);
         } 
             
-
         /* Set the transform */
         if (batch->transforms)
         {
+            TRACE("Transform idx %d\n", idx);
             d2d_device_context_SetTransform(iface, &batch->transforms[idx]);
         }
 
