@@ -116,6 +116,26 @@ static void d2d_clip_stack_pop(struct d2d_clip_stack *stack)
     --stack->count;
 }
 
+
+static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
+{
+    stack->stack = NULL;
+    stack->size = 0;
+    stack->count = 0;
+    return TRUE;
+}
+
+static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
+{
+    for (size_t i = 0; i < stack->count; ++i)
+    {
+        ID2D1Bitmap1_Release(stack->stack[i].target);
+        ID2D1Layer_Release(stack->stack[i].layer);
+    }
+    free(stack->stack);
+}
+
+
 static void d2d_device_context_draw(struct d2d_device_context *render_target, enum d2d_shape_type shape_type,
         ID3D11Buffer *ib, unsigned int index_count, ID3D11Buffer *vb, unsigned int vb_stride,
         struct d2d_brush *brush, struct d2d_brush *opacity_brush)
@@ -4667,21 +4687,3 @@ BOOL d2d_device_get_indexed_object(struct d2d_indexed_objects *objects, const GU
     return FALSE;
 }
 
-
-static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
-{
-    stack->stack = NULL;
-    stack->size = 0;
-    stack->count = 0;
-    return TRUE;
-}
-
-static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
-{
-    for (size_t i = 0; i < stack->count; ++i)
-    {
-        ID2D1Bitmap1_Release(stack->stack[i].target);
-        ID2D1Layer_Release(stack->stack[i].layer);
-    }
-    free(stack->stack);
-}
