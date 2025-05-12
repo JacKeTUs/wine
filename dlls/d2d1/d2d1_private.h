@@ -170,6 +170,20 @@ struct d2d_indexed_objects
     size_t count;
 };
 
+struct d2d_layer_entry
+{
+    ID2D1Bitmap *target;
+    ID2D1Layer *layer;
+    D2D1_LAYER_PARAMETERS1 params;
+};
+
+struct d2d_layer_stack
+{
+    struct d2d_layer_entry *stack;
+    size_t size;
+    size_t count;
+};
+
 struct d2d_device_context
 {
     ID2D1DeviceContext6 ID2D1DeviceContext6_iface;
@@ -412,19 +426,6 @@ struct d2d_layer
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
 
 
-struct d2d_layer_entry
-{
-    ID2D1Bitmap *target;
-    ID2D1Layer *layer;
-    D2D1_LAYER_PARAMETERS1 params;
-};
-
-struct d2d_layer_stack
-{
-    struct d2d_layer_entry *stack;
-    size_t size;
-    size_t count;
-};
 
 
 struct d2d_mesh
