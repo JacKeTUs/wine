@@ -2840,7 +2840,8 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     d2d_device_context_GetTransform(iface, &original_transform);
 
     /* Iterate over the sprites */
-    for (UINT32 idx = start_index; idx < min(sprite_count, batch->sprite_count); idx++)
+    UINT32 end_index = min(start_index + sprite_count, batch->sprite_count);
+    for (UINT32 idx = start_index; idx < end_index; idx++)
     {
         TRACE("Drawing %u sprite from batch.\n", idx);
         /* Prepare the transform */
@@ -2851,33 +2852,6 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         if (batch->destinationRects)
         {
             dst = &batch->destinationRects[idx];
-
-            /* Translate to the destination position */
-            D2D1_MATRIX_3X2_F translate = {{{
-                                                1.0f, 0.0f,
-                                                0.0f, 1.0f,
-                                                0.0f, 0.0f,
-                                            }}};
-
-            /* Scale to match the destination size */
-            FLOAT width = dst->right - dst->left;
-            FLOAT height = dst->bottom - dst->top;
-            D2D1_MATRIX_3X2_F scale = {{{
-                                            width, 0.0f,
-                                            0.0f, height, 
-                                            0.0f, 0.0f,
-                                        }}};
-
-            /* Apply translation and scaling */
-            d2d_matrix_multiply(&transform, &scale);
-            d2d_matrix_multiply(&transform, &translate);
-        }
-
-        /* Apply sprite-specific transform if provided */
-        if (batch->transforms)
-        {
-            /* Multiply transform with sprite-specific transform */
-            d2d_matrix_multiply(&transform, &batch->transforms[idx]);
         }
 
         /* Determine the source rectangle */
@@ -2891,7 +2865,6 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
                 WARN("Whole source rect is NULL\n");
                 continue;
             }
-                
         }
 
         /* Determine the opacity from the sprite color */
@@ -2903,15 +2876,17 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
             
 
         /* Set the transform */
-        d2d_device_context_SetTransform(iface, &transform);
+        if (batch->transforms)
+        {
+            d2d_device_context_SetTransform(iface, &batch->transforms[idx]);
+        }
 
         /* Draw the bitmap into sprite */
         d2d_device_context_DrawBitmap(iface, bitmap, dst, opacity, interpolation_mode, src_rect);
 
-        /* Restore the original transform */
-        d2d_device_context_SetTransform(iface, &original_transform);
     }
-
+    /* Restore the original transform */
+    d2d_device_context_SetTransform(iface, &original_transform);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSvgGlyphStyle(ID2D1DeviceContext6 *iface,
