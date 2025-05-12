@@ -774,7 +774,7 @@ struct d2d_bitmap *unsafe_impl_from_ID2D1Bitmap(ID2D1Bitmap *iface)
     return CONTAINING_RECORD(iface, struct d2d_bitmap, ID2D1Bitmap1_iface);
 }
 
-void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context,
+void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, const struct d2d_device_context *context,
         const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer)
 {
     struct d2d_layer_entry entry;

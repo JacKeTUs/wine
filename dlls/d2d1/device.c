@@ -1750,7 +1750,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         d2d_command_list_pop_layer(context->target.command_list);
 
     if (context->target.type == D2D_TARGET_BITMAP)
-        d2d_bitmap_pop_layer(context->target.bitmap);
+        d2d_bitmap_pop_layer(context->target.bitmap, context);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_Flush(ID2D1DeviceContext6 *iface, D2D1_TAG *tag1, D2D1_TAG *tag2)
