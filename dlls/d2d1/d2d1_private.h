@@ -172,7 +172,7 @@ struct d2d_indexed_objects
 
 struct d2d_layer_entry
 {
-    ID2D1Bitmap *target;
+    ID2D1Bitmap1 *target;
     ID2D1Layer *layer;
     D2D1_LAYER_PARAMETERS1 params;
 };

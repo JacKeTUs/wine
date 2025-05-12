@@ -4681,7 +4681,7 @@ static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
 {
     for (size_t i = 0; i < stack->count; ++i)
     {
-        ID2D1Bitmap_Release(stack->stack[i].target);
+        ID2D1Bitmap1_Release(stack->stack[i].target);
         ID2D1Layer_Release(stack->stack[i].layer);
     }
     free(stack->stack);
