@@ -2820,6 +2820,8 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     TRACE("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
             "sprite_options %u\n", iface, sprite_batch, start_index, sprite_count, bitmap,
             interpolation_mode, sprite_options);
+    FIXME("stub!\n");
+    return;
     
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
