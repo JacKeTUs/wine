@@ -810,7 +810,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
     if (context->layer_stack.count == context->layer_stack.size)
     {
         size_t new_size = max(4, context->layer_stack.size * 2);
-        struct d2d_layer_entry *new_entries = realloc(context->layer_stack.entries, new_size * sizeof(*new_entries));
+        struct d2d_layer_entry *new_entries = realloc(context->layer_stack.stack, new_size * sizeof(*new_entries));
         if (!new_entries)
         {
             context->error = E_OUTOFMEMORY;
@@ -820,7 +820,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
             return;
         }
 
-        context->layer_stack.entries = new_entries;
+        context->layer_stack.stack = new_entries;
         context->layer_stack.size = new_size;
     }
 
@@ -842,7 +842,7 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
         return;
     }
 
-    struct d2d_layer_entry *entry = &context->layer_stack.entries[--context->layer_stack.count];
+    struct d2d_layer_entry *entry = &context->layer_stack.stack[--context->layer_stack.count];
 
     ID2D1DeviceContext_SetTarget(context_iface, (ID2D1Image *)bitmap);
 
