@@ -270,6 +270,7 @@ static ULONG STDMETHODCALLTYPE d2d_device_context_inner_Release(IUnknown *iface)
         unsigned int i, j, k;
 
         d2d_clip_stack_cleanup(&context->clip_stack);
+        d2d_layer_stack_cleanup(&context->layer_stack);
         IDWriteRenderingParams_Release(context->default_text_rendering_params);
         if (context->text_rendering_params)
             IDWriteRenderingParams_Release(context->text_rendering_params);
@@ -4241,6 +4242,7 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         hr = E_FAIL;
         goto err;
     }
+    d2d_layer_stack_init(&render_target->layer_stack);
 
     render_target->desc.dpiX = 96.0f;
     render_target->desc.dpiY = 96.0f;
@@ -4663,4 +4665,24 @@ BOOL d2d_device_get_indexed_object(struct d2d_indexed_objects *objects, const GU
 
     if (object) *object = NULL;
     return FALSE;
+}
+
+
+static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
+{
+    stack->stack.entries = NULL;
+    stack->stack.size = 0;
+    stack->stack.count = 0;
+
+    return TRUE;
+}
+
+static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
+{
+    for (size_t i = 0; i < stack->count; ++i)
+    {
+        ID2D1Bitmap_Release(stack->stack[i].target);
+        ID2D1Layer_Release(stack->stack[i].layer);
+    }
+    free(stack->stack);
 }

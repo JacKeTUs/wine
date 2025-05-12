@@ -219,6 +219,7 @@ struct d2d_device_context
     D2D1_RENDER_TARGET_PROPERTIES desc;
     D2D1_SIZE_U pixel_size;
     struct d2d_clip_stack clip_stack;
+    struct d2d_layer_stack layer_stack;
 
     struct d2d_indexed_objects vertex_buffers;
 };
@@ -409,6 +410,22 @@ struct d2d_layer
 };
 
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
+
+
+struct d2d_layer_entry
+{
+    ID2D1Bitmap *target;
+    ID2D1Layer *layer;
+    D2D1_LAYER_PARAMETERS1 params;
+};
+
+struct d2d_layer_stack
+{
+    struct d2d_layer_entry *stack;
+    size_t size;
+    size_t count;
+};
+
 
 struct d2d_mesh
 {
