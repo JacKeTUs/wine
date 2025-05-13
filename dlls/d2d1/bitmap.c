@@ -779,6 +779,8 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 {
     struct d2d_layer_entry entry;
     ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
+    ID2D1Bitmap1 *bitmap_current = (ID2D1Bitmap1 *)&bitmap->ID2D1Bitmap1_iface;
+    ID2D1Bitmap1 *bitmap_temp;
 
     D2D1_SIZE_U size;
     size.width = bitmap->pixel_size.width / (bitmap->dpi_x / 96.0f);
@@ -794,7 +796,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
     TRACE("bitmap %p, context %p, params %p, layer %p.\n", bitmap, context, params, layer);
 
     HRESULT hr = ID2D1DeviceContext_CreateBitmap(context_iface, 
-            size, NULL, 0, (const D2D1_BITMAP_PROPERTIES1 *)&props, &entry.target);
+            size, NULL, 0, (const D2D1_BITMAP_PROPERTIES1 *)&props, &bitmap_temp);
     if (FAILED(hr))
     {
         ERR("Failed to create layer bitmap, hr %#x.\n", hr);
@@ -802,8 +804,14 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
         return;
     }
 
+    if (layer == NULL) {
+        // Probably creating temp bitmap should go inside of creating layer?
+        ID2D1DeviceContext_CreateLayer(context_iface, &layer);
+    }
+
+    entry.target = bitmap_current; // Store current bitmap on stack
     entry.params = *params;
-    entry.layer = layer;
+    entry.layer = layer; // should hold bitmap
     ID2D1Layer_AddRef(layer);
 
     if (context->layer_stack.count == context->layer_stack.size)
@@ -825,12 +833,14 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 
     context->layer_stack.stack[context->layer_stack.count++] = entry;
 
-    ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)entry.target);
+    ID2D1DeviceContext_SetTarget(&context->ID2D1DeviceContext6_iface, (ID2D1Image *)bitmap_temp); // Set new bitmap as current target
 }
 
 void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context)
 {
     ID2D1DeviceContext *context_iface = (ID2D1DeviceContext *)&context->ID2D1DeviceContext6_iface;
+    ID2D1Bitmap1 *bitmap_current = (ID2D1Bitmap1 *)&bitmap->ID2D1Bitmap1_iface;
+
     TRACE("bitmap %p, context %p.\n", bitmap, context);
 
     if (!context->layer_stack.count)
@@ -842,7 +852,8 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
 
     struct d2d_layer_entry *entry = &context->layer_stack.stack[--context->layer_stack.count];
 
-    ID2D1DeviceContext_SetTarget(context_iface, (ID2D1Image *)bitmap);
+    // Set pushed bitmap as target
+    ID2D1DeviceContext_SetTarget(context_iface, (ID2D1Image *)entry->target);
 
     D2D1_RECT_F rect = {
         .left = 0.0f,
@@ -851,9 +862,9 @@ void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *
         .bottom = (FLOAT)bitmap->pixel_size.height  / (bitmap->dpi_y / 96.0f),
     };
 
-    ID2D1DeviceContext_DrawBitmap(context_iface, entry->target, &rect,
+    // Draw current bitmap onto target
+    ID2D1DeviceContext_DrawBitmap(context_iface, bitmap_current, &rect,
             entry->params.opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, NULL, NULL);
 
-    ID2D1Bitmap1_Release(entry->target);
     ID2D1Layer_Release(entry->layer);
 }
