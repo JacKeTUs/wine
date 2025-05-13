@@ -27,7 +27,6 @@ static inline struct d2d_sprite_batch *impl_from_ID2D1SpriteBatch(ID2D1SpriteBat
 }
 
 
-
 static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_QueryInterface(ID2D1SpriteBatch *iface, REFIID iid, void **out)
 {
     TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
@@ -63,8 +62,10 @@ static ULONG STDMETHODCALLTYPE d2d_sprite_batch_Release(ID2D1SpriteBatch *iface)
 
     TRACE("%p decreasing refcount to %lu.\n", iface, refcount);
 
-    if (!refcount)
+    if (!refcount) {
+        ID2D1Factory_Release(sprite_batch->factory);
         free(sprite_batch);
+    }
 
     return refcount;
 }
@@ -107,8 +108,11 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
 
         if (!batch->destinationRects || (sourceRects && !batch->sourceRects) ||
             (colors && !batch->colors) || (transforms && !batch->transforms))
+        {
+            WARN("Out of memory when realloc");
             return E_OUTOFMEMORY;
-
+        }
+            
         batch->capacity = newCapacity;
     }
 
@@ -294,8 +298,6 @@ static const ID2D1SpriteBatchVtbl d2d_sprite_batch_vtbl =
 
 HRESULT d2d_sprite_batch_create(ID2D1Factory *factory, struct d2d_sprite_batch **sprite_batch)
 {
-    TRACE("Creating sprite batch %p.\n", *sprite_batch);
-
     if (!(*sprite_batch = calloc(1, sizeof(**sprite_batch))))
         return E_OUTOFMEMORY;
 
