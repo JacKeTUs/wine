@@ -806,7 +806,7 @@ void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context 
 
     if (layer == NULL) {
         // Probably creating temp bitmap should go inside of creating layer?
-        ID2D1DeviceContext_CreateLayer(context_iface, &layer);
+        ID2D1DeviceContext_CreateLayer(context_iface, &size, &layer);
     }
 
     entry.target = bitmap_current; // Store current bitmap on stack
