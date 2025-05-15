@@ -145,11 +145,12 @@ static BOOL d2d_layer_stack_push(struct d2d_layer_stack *stack, const struct d2d
     return TRUE;
 }
 
-static d2d_layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer *out)
+static BOOL d2d_layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer *out)
 {
     if (!stack->layer_count)
-        return;
+        return FALSE;
     *out = stack->layers[--stack->layer_count];
+    return TRUE;
 }
 
 
@@ -3028,7 +3029,7 @@ static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *
     HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
                                            size, NULL, 0, &props, out_bitmap);
     if (hr != S_OK) {
-        ERR("Create bitmap failed: %x\n", hr);
+        ERR("Create bitmap failed: %lx\n", hr);
     }
     return hr;
 }
@@ -3039,7 +3040,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    ID2D1DeviceContext_SetTransform(iface, &layer->saved_transform);
+    ID2D1DeviceContext6_SetTransform(iface, &layer->saved_transform);
 
     D2D1_RECT_F cb = layer->params.contentBounds;
     if (cb.right > cb.left && cb.bottom > cb.top)
@@ -3079,7 +3080,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
         ID2D1BitmapBrush1_Release(brush);
     }
     else {
-        ERR("Create bitmap brush failed: %x\n", hr);
+        ERR("Create bitmap brush failed: %lx\n", hr);
         return;
     }
     if (cb.right > cb.left && cb.bottom > cb.top)
@@ -3131,7 +3132,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
                                        &layer_context->size,
                                        &temp.bitmap);
     if (hr != S_OK) {
-        ERR("Create temp layer bitmap failed: %x\n", hr);
+        ERR("Create temp layer bitmap failed: %lx\n", hr);
         return;
     }
     ID2D1DeviceContext_SetTarget(iface, (ID2D1Image *)temp.bitmap);
