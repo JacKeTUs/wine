@@ -1629,7 +1629,7 @@ static void d2d_device_context_draw_glyph_run(struct d2d_device_context *context
             break;
     }
 
-    TRACE("antialias_mode %#x\n", context->drawing_state.textAntialiasMode);
+    TRACE("antialias_mode %#x\n", antialias_mode);
     TRACE("rendering_mode %#x\n", rendering_mode);
 
     if (rendering_mode == DWRITE_RENDERING_MODE_DEFAULT)
@@ -1717,7 +1717,8 @@ static void STDMETHODCALLTYPE d2d_device_context_SetTextAntialiasMode(ID2D1Devic
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_set_text_antialias_mode(context->target.command_list, antialias_mode);
 
-    context->drawing_state.textAntialiasMode = antialias_mode;
+    FIXME("Hack - try different antialias mode\n");
+    context->drawing_state.textAntialiasMode = D2D1_TEXT_ANTIALIAS_MODE_DEFAULT; // antialias_mode;
 }
 
 static D2D1_TEXT_ANTIALIAS_MODE STDMETHODCALLTYPE d2d_device_context_GetTextAntialiasMode(ID2D1DeviceContext6 *iface)
