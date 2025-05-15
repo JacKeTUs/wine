@@ -212,8 +212,8 @@ static void d2d_device_context_draw(struct d2d_device_context *render_target, en
         scissor_rect.bottom = render_target->pixel_size.height;
     }
 
-    TRACE("%f,%f %f,%f\n",scissor_rect.left,scissor_rect.top,scissor_rect.right,scissor_rect.bottom);
-    
+    TRACE("%ld,%ld %ld,%ld\n",scissor_rect.left,scissor_rect.top,scissor_rect.right,scissor_rect.bottom);
+
     ID3D11DeviceContext1_RSSetScissorRects(context, 1, &scissor_rect);
     ID3D11DeviceContext1_RSSetState(context, render_target->rs);
     ID3D11DeviceContext1_OMSetRenderTargets(context, 1, &render_target->target.bitmap->rtv, NULL);
