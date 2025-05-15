@@ -118,7 +118,7 @@ static void d2d_clip_stack_pop(struct d2d_clip_stack *stack)
 
 
 
-static BOOL layer_stack_init(struct d2d_layer_stack *stack)
+static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
 {
     stack->layer_capacity = 0;
     stack->layer_count = 0;
@@ -127,7 +127,7 @@ static BOOL layer_stack_init(struct d2d_layer_stack *stack)
         ? TRUE : FALSE;
 }
 
-static void layer_stack_free(struct d2d_layer_stack *stack)
+static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
 {
     free(stack->layers);
     stack->layers = NULL;
@@ -135,7 +135,7 @@ static void layer_stack_free(struct d2d_layer_stack *stack)
     stack->layer_count = 0;
 }
 
-static BOOL layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_layer *entry)
+static BOOL d2d_layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_layer *entry)
 {
     if (!d2d_array_reserve((void **)&stack->layers, &stack->layer_capacity,
                            stack->layer_count + 1, sizeof(*stack->layers)))
@@ -145,7 +145,7 @@ static BOOL layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_lay
     return TRUE;
 }
 
-static layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer *out)
+static d2d_layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer *out)
 {
     if (!stack->layer_count)
         return;
@@ -307,6 +307,7 @@ static ULONG STDMETHODCALLTYPE d2d_device_context_inner_Release(IUnknown *iface)
         unsigned int i, j, k;
 
         d2d_clip_stack_cleanup(&context->clip_stack);
+        d2d_layer_stack_cleanup(&context->layer_stack);
         IDWriteRenderingParams_Release(context->default_text_rendering_params);
         if (context->text_rendering_params)
             IDWriteRenderingParams_Release(context->text_rendering_params);
@@ -3138,7 +3139,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
         ID2D1DeviceContext_SetAntialiasMode(iface,
                                            layer_parameters->maskAntialiasMode);
-    layer_stack_push(&context->layer_stack, &temp);
+    d2d_layer_stack_push(&context->layer_stack, &temp);
 
     // For debugging, lets fill geometric mask if exists.
     /*
@@ -3163,7 +3164,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     }
 
     struct d2d_layer entry;
-    if (!layer_stack_pop(&context->layer_stack, &entry))
+    if (!d2d_layer_stack_pop(&context->layer_stack, &entry))
         return;
     ID2D1DeviceContext_SetTarget(iface, entry.prev_target);
     ID2D1DeviceContext_SetTransform(iface, &entry.saved_transform);
@@ -4404,7 +4405,12 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         hr = E_FAIL;
         goto err;
     }
-    render_target->layers_head = NULL;
+    if (!d2d_layer_stack_init(&render_target->layer_stack))
+    {
+        WARN("Failed to initialize layer stack.\n");
+        hr = E_FAIL;
+        goto err;
+    }
 
     render_target->desc.dpiX = 96.0f;
     render_target->desc.dpiY = 96.0f;
