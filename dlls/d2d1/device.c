@@ -4736,8 +4736,3 @@ BOOL d2d_device_get_indexed_object(struct d2d_indexed_objects *objects, const GU
     if (object) *object = NULL;
     return FALSE;
 }
-
-static inline struct d2d_layer *impl_from_ID2D1Layer(ID2D1Layer *iface)
-{
-    return CONTAINING_RECORD(iface, struct d2d_layer, ID2D1Layer_iface);
-}
