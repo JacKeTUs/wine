@@ -1924,6 +1924,8 @@ static void STDMETHODCALLTYPE d2d_device_context_Clear(ID2D1DeviceContext6 *ifac
     HRESULT hr;
 
     TRACE("iface %p, colour %p.\n", iface, colour);
+    FIXME("wtf\n");
+    return;
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
     {
