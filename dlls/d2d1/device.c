@@ -3013,7 +3013,7 @@ static void STDMETHODCALLTYPE d2d_device_context_BlendImage(ID2D1DeviceContext6 
 
 static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *iface,
                                                             const D2D1_RECT_F *bounds,
-                                                            ID2D1Bitmap1 **out_bitmap)
+                                                            ID2D1Bitmap **out_bitmap)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     D2D1_SIZE_U size = { (UINT32)(bounds->right - bounds->left),
@@ -3026,7 +3026,7 @@ static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *
         .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
         .colorContext = NULL
     };
-    HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
+    HRESULT hr = ID2D1DeviceContext_CreateBitmap((ID2D1DeviceContext6*)iface,
                                            size, NULL, 0, &props, out_bitmap);
     if (hr != S_OK) {
         ERR("Create bitmap failed: %lx\n", hr);
@@ -3128,8 +3128,10 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     temp.prev_target = old;
     ID2D1DeviceContext6_GetTransform(iface, &temp.saved_transform);
     HRESULT hr;
+
+    D2D1_RECT_F bitmap_rect = {0.0,0.0,layer_context->size.width,layer_context->size.height};
     hr = d2d_device_context_create_temp_layer_bitmap(iface,
-                                       &layer_context->size,
+                                       &bitmap_rect,
                                        &temp.bitmap);
     if (hr != S_OK) {
         ERR("Create temp layer bitmap failed: %lx\n", hr);
@@ -3169,8 +3171,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     struct d2d_layer entry;
     if (!d2d_layer_stack_pop(&context->layer_stack, &entry))
         return;
-    ID2D1DeviceContext_SetTarget(iface, entry.prev_target);
-    ID2D1DeviceContext_SetTransform(iface, &entry.saved_transform);
+    ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image*)entry.prev_target);
+    ID2D1DeviceContext6_SetTransform(iface, &entry.saved_transform);
     d2d_device_context_composite_layer_bitmap(iface, &entry);
     ID2D1Bitmap_Release(entry.bitmap);
     ID2D1Bitmap_Release(entry.prev_target);
