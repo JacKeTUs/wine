@@ -3143,7 +3143,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
         ID2D1DeviceContext6_SetAntialiasMode(iface,
                                            layer_parameters->maskAntialiasMode);
-    d2d_layer_stack_push(&context->layer_stack, &layer_context);
+    d2d_layer_stack_push(&context->layer_stack, layer_context);
 
     // For debugging, lets fill geometric mask if exists.
     /*
