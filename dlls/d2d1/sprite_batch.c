@@ -172,20 +172,18 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_SetSprites(ID2D1SpriteBatch *i
     /* Update only specified sprites */
     for (UINT32 i = startIndex; i < spriteCount; i++)
     {
-        UINT32 spriteIdx = startIndex + i;
-
         if (destinationRects)
             batch->sprites[i].destinationRect = *(const D2D1_RECT_F *)((const char *)destinationRects + 
-                                (i - batch->sprite_count) * destinationRectanglesStride);
+                                (i - startIndex) * destinationRectanglesStride);
         if (sourceRects)
             batch->sprites[i].sourceRect = *(const D2D1_RECT_U *)((const char *)sourceRects + 
-                                (i - batch->sprite_count) * sourceRectanglesStride);
+                                (i - startIndex) * sourceRectanglesStride);
         if (colors)
             batch->sprites[i].color = *(const D2D1_COLOR_F *)((const char *)colors + 
-                                (i - batch->sprite_count) * colorsStride);
+                                (i - startIndex) * colorsStride);
         if (transforms)
             batch->sprites[i].transform = *(const D2D1_MATRIX_3X2_F *)((const char *)transforms + 
-                                (i - batch->sprite_count) * transformsStride);
+                                (i - startIndex) * transformsStride);
     }
 
     return S_OK;
