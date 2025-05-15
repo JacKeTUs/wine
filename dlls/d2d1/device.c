@@ -3123,6 +3123,9 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
         return;
     }
+    d2d_device_context_PushAxisAlignedClip(iface,
+                                            &layer_parameters->contentBounds,
+                                            layer_parameters->maskAntialiasMode);
 
     return;
 
@@ -3194,6 +3197,9 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         d2d_command_list_pop_layer(context->target.command_list);
         return;
     }
+
+    d2d_device_context_PopAxisAlignedClip(iface);
+    
     return;
 
     struct d2d_layer entry;
