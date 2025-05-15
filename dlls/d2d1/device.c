@@ -3044,7 +3044,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
 
     D2D1_RECT_F cb = layer->params.contentBounds;
     if (cb.right > cb.left && cb.bottom > cb.top)
-        ID2D1DeviceContext_PushAxisAlignedClip(iface, &cb,
+        ID2D1DeviceContext6_PushAxisAlignedClip(iface, &cb,
                                               D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     D2D1_BITMAP_BRUSH_PROPERTIES bmp_props = {
@@ -3054,7 +3054,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
     };
     ID2D1BitmapBrush1 *brush;
     HRESULT hr;
-    hr = ID2D1DeviceContext_CreateBitmapBrush(iface, layer->bitmap,
+    hr = ID2D1DeviceContext_CreateBitmapBrush((ID2D1DeviceContext*)iface, layer->bitmap,
                                                 &bmp_props, NULL,
                                                 &brush);
     if (hr == S_OK)
@@ -3063,17 +3063,17 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
                                 layer->params.opacity);
         if (layer->params.geometricMask)
         {
-            ID2D1DeviceContext_SetAntialiasMode(iface,
+            ID2D1DeviceContext6_SetAntialiasMode(iface,
                 layer->params.maskAntialiasMode);
             //ID2D1DeviceContext_SetTransform(iface,
             //   &layer->params.maskTransform);
-            ID2D1DeviceContext_FillGeometry(iface,
+            ID2D1DeviceContext6_FillGeometry(iface,
                 layer->params.geometricMask,
                 (ID2D1Brush *)brush, NULL);
         }
         else
         {
-            ID2D1DeviceContext_FillRectangle(iface,
+            ID2D1DeviceContext6_FillRectangle(iface,
                 &layer->params.contentBounds,
                 (ID2D1Brush *)brush);
         }
@@ -3084,7 +3084,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
         return;
     }
     if (cb.right > cb.left && cb.bottom > cb.top)
-        ID2D1DeviceContext_PopAxisAlignedClip(iface);
+        ID2D1DeviceContext6_PopAxisAlignedClip(iface);
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID2D1DeviceContext6 *iface,
@@ -3124,9 +3124,9 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     ID2D1Bitmap1 *old;
     struct d2d_layer temp;
     temp.params = *layer_parameters;
-    ID2D1DeviceContext_GetTarget(iface, (ID2D1Image **)&old);
+    ID2D1DeviceContext6_GetTarget(iface, (ID2D1Image **)&old);
     temp.prev_target = old;
-    ID2D1DeviceContext_GetTransform(iface, &temp.saved_transform);
+    ID2D1DeviceContext6_GetTransform(iface, &temp.saved_transform);
     HRESULT hr;
     hr = d2d_device_context_create_temp_layer_bitmap(iface,
                                        &layer_context->size,
@@ -3135,12 +3135,12 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         ERR("Create temp layer bitmap failed: %lx\n", hr);
         return;
     }
-    ID2D1DeviceContext_SetTarget(iface, (ID2D1Image *)temp.bitmap);
+    ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image *)temp.bitmap);
     //ID2D1DeviceContext_SetTransform(iface,
     //                                &layer_parameters->maskTransform);
     if (layer_parameters->maskAntialiasMode !=
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
-        ID2D1DeviceContext_SetAntialiasMode(iface,
+        ID2D1DeviceContext6_SetAntialiasMode(iface,
                                            layer_parameters->maskAntialiasMode);
     d2d_layer_stack_push(&context->layer_stack, &temp);
 
