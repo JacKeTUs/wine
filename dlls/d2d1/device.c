@@ -3013,7 +3013,7 @@ static void STDMETHODCALLTYPE d2d_device_context_BlendImage(ID2D1DeviceContext6 
 
 static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *iface,
                                                             const D2D1_RECT_F *bounds,
-                                                            ID2D1Bitmap **out_bitmap)
+                                                            ID2D1Bitmap1 **out_bitmap)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     D2D1_SIZE_U size = { (UINT32)(bounds->right - bounds->left),
@@ -3026,7 +3026,7 @@ static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *
         .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
         .colorContext = NULL
     };
-    HRESULT hr = ID2D1DeviceContext_CreateBitmap((ID2D1DeviceContext6*)iface,
+    HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
                                            size, NULL, 0, &props, out_bitmap);
     if (hr != S_OK) {
         ERR("Create bitmap failed: %lx\n", hr);
