@@ -3121,30 +3121,29 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
 
 
-    ID2D1Bitmap1 *old;
-    struct d2d_layer temp;
-    temp.params = *layer_parameters;
-    ID2D1DeviceContext6_GetTarget(iface, (ID2D1Image **)&old);
-    temp.prev_target = old;
-    ID2D1DeviceContext6_GetTransform(iface, &temp.saved_transform);
+    ID2D1Image *old;
+    layer_context->params = *layer_parameters;
+    ID2D1DeviceContext6_GetTarget(iface, &old);
+    layer_context->prev_target = old;
+    ID2D1DeviceContext6_GetTransform(iface, &layer_context->saved_transform);
     HRESULT hr;
 
     D2D1_RECT_F bitmap_rect = {0.0,0.0,layer_context->size.width,layer_context->size.height};
     hr = d2d_device_context_create_temp_layer_bitmap(iface,
                                        &bitmap_rect,
-                                       &temp.bitmap);
+                                       &layer_context->bitmap);
     if (hr != S_OK) {
         ERR("Create temp layer bitmap failed: %lx\n", hr);
         return;
     }
-    ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image *)temp.bitmap);
+    ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image *)layer_context->bitmap);
     //ID2D1DeviceContext_SetTransform(iface,
     //                                &layer_parameters->maskTransform);
     if (layer_parameters->maskAntialiasMode !=
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
         ID2D1DeviceContext6_SetAntialiasMode(iface,
                                            layer_parameters->maskAntialiasMode);
-    d2d_layer_stack_push(&context->layer_stack, &temp);
+    d2d_layer_stack_push(&context->layer_stack, &layer_context);
 
     // For debugging, lets fill geometric mask if exists.
     /*
@@ -3171,11 +3170,11 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     struct d2d_layer entry;
     if (!d2d_layer_stack_pop(&context->layer_stack, &entry))
         return;
-    ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image*)entry.prev_target);
+    ID2D1DeviceContext6_SetTarget(iface, entry.prev_target);
     ID2D1DeviceContext6_SetTransform(iface, &entry.saved_transform);
     d2d_device_context_composite_layer_bitmap(iface, &entry);
     ID2D1Bitmap1_Release(entry.bitmap);
-    ID2D1Bitmap1_Release(entry.prev_target);
+    
     if (entry.params.geometricMask)
         ID2D1Geometry_Release(entry.params.geometricMask);
 }

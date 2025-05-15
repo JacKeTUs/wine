@@ -418,7 +418,7 @@ struct d2d_layer
     ID2D1Factory *factory;
 
     ID2D1Bitmap1 *bitmap;
-    ID2D1Bitmap1 *prev_target;
+    ID2D1Image *prev_target;
     D2D1_MATRIX_3X2_F saved_transform;
 
     D2D1_LAYER_PARAMETERS1 params;
