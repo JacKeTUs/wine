@@ -1737,21 +1737,6 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_push_layer(context->target.command_list, context, &parameters, layer);
 
-    TRACE("layer bounds %f,%f %f,%f\n",
-            layer_parameters->contentBounds.left,
-            layer_parameters->contentBounds.bottom,
-            layer_parameters->contentBounds.right,
-            layer_parameters->contentBounds.top);
-
-    TRACE("layer geomask %p\n",
-            layer_parameters->geometricMask);
-    
-    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
-        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
-        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
-        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
-
-    ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
@@ -1763,7 +1748,28 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_pop_layer(context->target.command_list);
 
+    // Clip
     ID2D1DeviceContext_PopAxisAlignedClip(iface);
+
+    // Get bitmap from current target
+
+    ID2D1Bitmap1 *new_bitmap;
+    d2d_device_context_GetTarget(iface, &new_bitmap);
+
+    struct d2d_layer *popped_layer = context->layers_head;
+    if (!popped_layer) {
+        WARN("Layer stack empty!\n");
+        return;
+    }
+    context->layers_head = popped_layer->prev;
+    
+    d2d_device_context_SetTarget(iface, (ID2D1Image*)popped_layer->bitmap);
+    d2d_device_context_DrawBitmap(iface,new_bitmap,NULL,
+        popped_layer->layer_parameters->opacity,
+        D2D1_INTERPOLATION_MODE_LINEAR,NULL);
+    ID2D1Bitmap1_Release(new_bitmap);
+    ID2D1Layer *layer = &popped_layer->ID2D1Layer_iface;
+    ID2D1Layer_Release(layer);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_Flush(ID2D1DeviceContext6 *iface, D2D1_TAG *tag1, D2D1_TAG *tag2)
@@ -2654,6 +2660,56 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
         layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
         layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
+
+
+
+    if (!layer) {
+        D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
+        d2d_device_context_CreateLayer(iface, &curSize, &layer);
+    }
+    struct d2d_layer *layer_context = impl_from_ID2D1Layer(layer);
+
+    TRACE("layer bounds %f,%f %f,%f\n",
+            layer_parameters->contentBounds.left,
+            layer_parameters->contentBounds.top,
+            layer_parameters->contentBounds.right,
+            layer_parameters->contentBounds.bottom);
+
+    TRACE("layer geomask %p\n",
+            layer_parameters->geometricMask);
+    
+    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
+        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
+        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
+        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
+
+    
+    // Create empty layer bitmap and set it as target
+    HRESULT hr;
+    D2D1_SIZE_U curSize = {context->pixel_size.width,context->pixel_size.height};
+    D2D1_BITMAP_PROPERTIES1 curProp;
+    curProp.dpiX = context->target.bitmap->dpi_x;
+    curProp.dpiY = context->target.bitmap->dpi_y;
+    D2D1_PIXEL_FORMAT curForm = { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE };
+    curProp.pixelFormat = curForm;
+    curProp.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+
+    ID2D1Bitmap1 *old_bitmap;
+    ID2D1Bitmap1 *new_bitmap;
+    hr = d2d_device_context_CreateBitmap(
+            iface,
+            curSize,
+            NULL, 0,
+            &curProp,
+        &new_bitmap);
+    
+    d2d_device_context_GetTarget(iface, &old_bitmap);
+    d2d_device_context_SetTarget(iface, (ID2D1Image*)new_bitmap);
+
+    layer_context->bitmap = old_bitmap;
+    layer_context->layer_parameters = layer_parameters;
+    layer_context->prev = (void*)context->layers_head;
+    context->layers_head = layer_context;
 
     ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
 }
@@ -4256,6 +4312,7 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         hr = E_FAIL;
         goto err;
     }
+    render_target->layers_head = NULL;
 
     render_target->desc.dpiX = 96.0f;
     render_target->desc.dpiY = 96.0f;
@@ -4680,3 +4737,7 @@ BOOL d2d_device_get_indexed_object(struct d2d_indexed_objects *objects, const GU
     return FALSE;
 }
 
+static inline struct d2d_layer *impl_from_ID2D1Layer(ID2D1Layer *iface)
+{
+    return CONTAINING_RECORD(iface, struct d2d_layer, ID2D1Layer_iface);
+}

@@ -222,6 +222,8 @@ struct d2d_device_context
     struct d2d_clip_stack clip_stack;
 
     struct d2d_indexed_objects vertex_buffers;
+
+    struct d2d_layer* layers_head;
 };
 
 HRESULT d2d_d3d_create_render_target(struct d2d_device *device, IDXGISurface *surface, IUnknown *outer_unknown,
@@ -406,6 +408,12 @@ struct d2d_layer
     LONG refcount;
 
     ID2D1Factory *factory;
+
+    ID2D1Bitmap1 *bitmap;
+    D2D1_LAYER_PARAMETERS *layer_parameters;
+
+    void* prev;
+
     D2D1_SIZE_F size;
 };
 

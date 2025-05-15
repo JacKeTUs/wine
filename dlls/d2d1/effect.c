@@ -1911,7 +1911,7 @@ static HRESULT STDMETHODCALLTYPE d2d_effect_QueryInterface(ID2D1Effect *iface, R
             || IsEqualGUID(iid, &IID_ID2D1Bitmap))
     {
         if (effect->input_count > 0) {
-            ERR("HACK: Returning input[0] as effect bitmap output\n");
+            FIXME("HACK: Returning input[0] as effect bitmap output\n");
             ID2D1Image *input_image = effect->inputs[0];
             return ID2D1Image_QueryInterface(input_image, iid, out);
         }
