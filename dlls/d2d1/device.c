@@ -459,6 +459,7 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSolidColorBrush(ID2D1D
     HRESULT hr;
 
     TRACE("iface %p, color %p, desc %p, brush %p.\n", iface, color, desc, brush);
+    TRACE("brush color is %f %f %f %f\n", color->r, color->g, color->b, color->a);
 
     if (SUCCEEDED(hr = d2d_solid_color_brush_create(render_target->factory, color, desc, &object)))
         *brush = (ID2D1SolidColorBrush *)&object->ID2D1Brush_iface;
