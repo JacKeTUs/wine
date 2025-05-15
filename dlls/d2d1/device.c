@@ -3126,10 +3126,12 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     ID2D1DeviceContext_GetTarget(iface, (ID2D1Image **)&old);
     temp.prev_target = old;
     ID2D1DeviceContext_GetTransform(iface, &temp.saved_transform);
-    if (FAILED(d2d_device_context_create_temp_layer_bitmap(iface,
-                                       &layer_parameters->contentBounds,
-                                       &temp.bitmap))) {
-        ERR("Create temp layer bitmap failed\n");
+    HRESULT hr;
+    hr = d2d_device_context_create_temp_layer_bitmap(iface,
+                                       &layer_context->size,
+                                       &temp.bitmap);
+    if (hr != S_OK) {
+        ERR("Create temp layer bitmap failed: %x\n", hr);
         return;
     }
     ID2D1DeviceContext_SetTarget(iface, (ID2D1Image *)temp.bitmap);
