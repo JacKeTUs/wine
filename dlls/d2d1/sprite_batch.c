@@ -64,6 +64,8 @@ static ULONG STDMETHODCALLTYPE d2d_sprite_batch_Release(ID2D1SpriteBatch *iface)
 
     if (!refcount) {
         ID2D1Factory_Release(sprite_batch->factory);
+        
+        free(sprite_batch->sprites);
         free(sprite_batch);
     }
 
