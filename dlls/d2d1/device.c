@@ -117,24 +117,6 @@ static void d2d_clip_stack_pop(struct d2d_clip_stack *stack)
 }
 
 
-static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
-{
-    stack->stack = NULL;
-    stack->size = 0;
-    stack->count = 0;
-    return TRUE;
-}
-
-static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
-{
-    for (size_t i = 0; i < stack->count; ++i)
-    {
-        ID2D1Bitmap1_Release(stack->stack[i].target);
-        ID2D1Layer_Release(stack->stack[i].layer);
-    }
-    free(stack->stack);
-}
-
 
 static void d2d_device_context_draw(struct d2d_device_context *render_target, enum d2d_shape_type shape_type,
         ID3D11Buffer *ib, unsigned int index_count, ID3D11Buffer *vb, unsigned int vb_stride,
@@ -290,7 +272,6 @@ static ULONG STDMETHODCALLTYPE d2d_device_context_inner_Release(IUnknown *iface)
         unsigned int i, j, k;
 
         d2d_clip_stack_cleanup(&context->clip_stack);
-        d2d_layer_stack_cleanup(&context->layer_stack);
         IDWriteRenderingParams_Release(context->default_text_rendering_params);
         if (context->text_rendering_params)
             IDWriteRenderingParams_Release(context->text_rendering_params);
@@ -1756,8 +1737,21 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_push_layer(context->target.command_list, context, &parameters, layer);
 
-    if (context->target.type == D2D_TARGET_BITMAP)
-        d2d_bitmap_push_layer(context->target.bitmap, context, &parameters, layer);
+    TRACE("layer bounds %f,%f %f,%f\n",
+            layer_parameters->contentBounds.left,
+            layer_parameters->contentBounds.bottom,
+            layer_parameters->contentBounds.right,
+            layer_parameters->contentBounds.top);
+
+    TRACE("layer geomask %p\n",
+            layer_parameters->geometricMask);
+    
+    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
+        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
+        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
+        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
+
+    ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
@@ -1769,8 +1763,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_pop_layer(context->target.command_list);
 
-    if (context->target.type == D2D_TARGET_BITMAP)
-        d2d_bitmap_pop_layer(context->target.bitmap, context);
+    ID2D1DeviceContext_PopAxisAlignedClip(iface);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_Flush(ID2D1DeviceContext6 *iface, D2D1_TAG *tag1, D2D1_TAG *tag2)
@@ -2644,11 +2637,25 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    {
         d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
-
+    }
     
-    if (context->target.type == D2D_TARGET_BITMAP)
-        d2d_bitmap_push_layer(context->target.bitmap, context, layer_parameters, layer);
+    TRACE("layer bounds %f,%f %f,%f\n",
+            layer_parameters->contentBounds.left,
+            layer_parameters->contentBounds.bottom,
+            layer_parameters->contentBounds.right,
+            layer_parameters->contentBounds.top);
+
+    TRACE("layer geomask %p\n",
+            layer_parameters->geometricMask);
+    
+    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
+        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
+        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
+        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
+
+    ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_InvalidateEffectInputRectangle(ID2D1DeviceContext6 *iface,
@@ -4249,7 +4256,6 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         hr = E_FAIL;
         goto err;
     }
-    d2d_layer_stack_init(&render_target->layer_stack);
 
     render_target->desc.dpiX = 96.0f;
     render_target->desc.dpiY = 96.0f;

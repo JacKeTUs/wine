@@ -170,19 +170,6 @@ struct d2d_indexed_objects
     size_t count;
 };
 
-struct d2d_layer_entry
-{
-    ID2D1Bitmap1 *target;
-    ID2D1Layer *layer;
-    D2D1_LAYER_PARAMETERS1 params;
-};
-
-struct d2d_layer_stack
-{
-    struct d2d_layer_entry *stack;
-    size_t size;
-    size_t count;
-};
 
 struct d2d_device_context
 {
@@ -233,7 +220,6 @@ struct d2d_device_context
     D2D1_RENDER_TARGET_PROPERTIES desc;
     D2D1_SIZE_U pixel_size;
     struct d2d_clip_stack clip_stack;
-    struct d2d_layer_stack layer_stack;
 
     struct d2d_indexed_objects vertex_buffers;
 };
@@ -464,9 +450,6 @@ HRESULT d2d_bitmap_create_from_wic_bitmap(struct d2d_device_context *context, IW
         const D2D1_BITMAP_PROPERTIES1 *desc, struct d2d_bitmap **bitmap);
 unsigned int d2d_get_bitmap_options_for_surface(IDXGISurface *surface);
 struct d2d_bitmap *unsafe_impl_from_ID2D1Bitmap(ID2D1Bitmap *iface);
-void d2d_bitmap_push_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context,
-        const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer);
-void d2d_bitmap_pop_layer(struct d2d_bitmap *bitmap, struct d2d_device_context *context);
 
 struct d2d_state_block
 {
