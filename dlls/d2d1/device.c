@@ -3026,7 +3026,7 @@ static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *
         .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
         .colorContext = NULL
     };
-    HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
+    HRESULT hr = ID2D1DeviceContext_CreateBitmap((ID2D1DeviceContext*)iface,
                                            size, NULL, 0, &props, out_bitmap);
     if (hr != S_OK) {
         ERR("Create bitmap failed: %lx\n", hr);
@@ -3047,14 +3047,14 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
         ID2D1DeviceContext6_PushAxisAlignedClip(iface, &cb,
                                               D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
-    D2D1_BITMAP_BRUSH_PROPERTIES bmp_props = {
+    D2D1_BITMAP_BRUSH_PROPERTIES1 bmp_props = {
         .extendModeX = D2D1_EXTEND_MODE_CLAMP,
         .extendModeY = D2D1_EXTEND_MODE_CLAMP,
         .interpolationMode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
     };
     ID2D1BitmapBrush1 *brush;
     HRESULT hr;
-    hr = ID2D1DeviceContext_CreateBitmapBrush((ID2D1DeviceContext*)iface, layer->bitmap,
+    hr = ID2D1DeviceContext_CreateBitmapBrush((ID2D1DeviceContext*)iface, (ID2D1Bitmap*)layer->bitmap,
                                                 &bmp_props, NULL,
                                                 &brush);
     if (hr == S_OK)
@@ -3174,8 +3174,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     ID2D1DeviceContext6_SetTarget(iface, (ID2D1Image*)entry.prev_target);
     ID2D1DeviceContext6_SetTransform(iface, &entry.saved_transform);
     d2d_device_context_composite_layer_bitmap(iface, &entry);
-    ID2D1Bitmap_Release(entry.bitmap);
-    ID2D1Bitmap_Release(entry.prev_target);
+    ID2D1Bitmap1_Release(entry.bitmap);
+    ID2D1Bitmap1_Release(entry.prev_target);
     if (entry.params.geometricMask)
         ID2D1Geometry_Release(entry.params.geometricMask);
 }
