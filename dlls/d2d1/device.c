@@ -3020,7 +3020,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
         layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
 
-    
+    /*
     // Create empty layer bitmap and set it as target
     HRESULT hr;
     D2D1_SIZE_U curSize = {context->pixel_size.width,context->pixel_size.height};
@@ -3047,6 +3047,16 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     layer_context->layer_parameters = layer_parameters;
     layer_context->prev = (void*)context->layers_head;
     context->layers_head = layer_context;
+*/
+
+    // For debugging, lets fill geometric mask if exists.
+    if (layer_parameters->geometricMask) {
+        D2D1_COLOR_F brush_color = {0.0f, 0.0f, 0.5f, 1.0};
+        ID2D1SolidColorBrush *brush;
+        ID2D1DeviceContext_CreateSolidColorBrush(iface, &brush_color,NULL, &brush);
+        ID2D1DeviceContext_FillGeometry(iface, layer_parameters->geometricMask, brush, NULL);
+        ID2D1SolidColorBrush_Release(brush);
+    }
 
     ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
 }
@@ -3062,7 +3072,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     // Clip
     ID2D1DeviceContext_PopAxisAlignedClip(iface);
-
+/*
     // Get bitmap from current target
 
     ID2D1Bitmap1 *new_bitmap;
@@ -3081,7 +3091,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         D2D1_INTERPOLATION_MODE_LINEAR,NULL);
     ID2D1Bitmap1_Release(new_bitmap);
     ID2D1Layer *layer = &popped_layer->ID2D1Layer_iface;
-    ID2D1Layer_Release(layer);
+    ID2D1Layer_Release(layer);*/
 }
 
 static const struct ID2D1DeviceContext6Vtbl d2d_device_context_vtbl =
