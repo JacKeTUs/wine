@@ -2844,11 +2844,9 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         ID2D1SpriteBatch *sprite_batch, UINT32 start_index, UINT32 sprite_count, ID2D1Bitmap *bitmap,
         D2D1_BITMAP_INTERPOLATION_MODE interpolation_mode, D2D1_SPRITE_OPTIONS sprite_options)
 {
-    TRACE("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
+    FIXME("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
             "sprite_options %u\n", iface, sprite_batch, start_index, sprite_count, bitmap,
             interpolation_mode, sprite_options);
-    FIXME("stub!\n");
-    return;
     
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
@@ -2866,57 +2864,41 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
     TRACE("Drawing %u sprites from batch.\n", sprite_count);
 
-    /* Save the current transform */
-    D2D1_MATRIX_3X2_F original_transform;
-    d2d_device_context_GetTransform(iface, &original_transform);
-
     /* Iterate over the sprites */
-    UINT32 end_index = min(start_index + sprite_count, batch->sprite_count);
-    for (UINT32 idx = start_index; idx < end_index; idx++)
+    for (UINT32 i = start_index; i < start_index + sprite_count; i++)
     {
-        TRACE("Drawing %u sprite from batch.\n", idx);
+        TRACE("Drawing %u sprite from batch.\n", i);
 
-        D2D1_RECT_F *dst = NULL;
+        // Basically need to draw our bitmap into dst,src from batch, with opacity in color (no color mult for now) and transforming
+        // For now ignore interpolation mode or other sprite options.
 
-        if (batch->destinationRects)
-        {
-            TRACE("Set dest rect idx %d\n", idx);
-            dst = &batch->destinationRects[idx];
-        }
+        // Not so efficient, because we always clip from InfiniteMatrix and transform our rect from identity.
+        D2D1_RECT_F dst = batch->sprites[i].destinationRect;
 
-        /* Determine the source rectangle */
-        const D2D1_RECT_F *src_rect = batch->sourceRects ? (D2D1_RECT_F*)&batch->sourceRects[idx] : NULL;
+        D2D1_RECT_F transformed_rect;
+        float x_scale, y_scale;
+        D2D1_POINT_2F point;
 
-        /* Handle sprite options (e.g., flipping) */
-        if (sprite_options & D2D1_SPRITE_OPTIONS_CLAMP_TO_SOURCE_RECTANGLE)
-        {
-            /* Ensure source rect is not NULL */
-            if (!src_rect) {
-                WARN("Whole source rect is NULL\n");
-                continue;
-            }
-        }
+        // Copied from somewhere here
+        x_scale = context->desc.dpiX / 96.0f;
+        y_scale = context->desc.dpiY / 96.0f;
+        d2d_point_transform(&point, &batch->sprites[i].transform,
+                dst.left * x_scale, dst.top * y_scale);
+        d2d_rect_set(&transformed_rect, point.x, point.y, point.x, point.y);
+        d2d_point_transform(&point, &batch->sprites[i].transform,
+                dst.left * x_scale, dst.bottom * y_scale);
+        d2d_rect_expand(&transformed_rect, &point);
+        d2d_point_transform(&point, &batch->sprites[i].transform,
+                dst.right * x_scale, dst.top * y_scale);
+        d2d_rect_expand(&transformed_rect, &point);
+        d2d_point_transform(&point, &batch->sprites[i].transform,
+                dst.right * x_scale, dst.bottom * y_scale);
+        d2d_rect_expand(&transformed_rect, &point);
 
-        /* Determine the opacity from the sprite color */
-        FLOAT opacity = 1.0f;
-        if (batch->colors) {
-            opacity = batch->colors[idx].a;
-            TRACE("opacity %f\n", opacity);
-        } 
-            
-        /* Set the transform */
-        if (batch->transforms)
-        {
-            TRACE("Transform idx %d\n", idx);
-            d2d_device_context_SetTransform(iface, &batch->transforms[idx]);
-        }
 
         /* Draw the bitmap into sprite */
-        d2d_device_context_DrawBitmap(iface, bitmap, dst, opacity, interpolation_mode, src_rect);
-
+        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, batch->sprites[i].color.a, interpolation_mode, &batch->sprites[i].sourceRect);
     }
-    /* Restore the original transform */
-    d2d_device_context_SetTransform(iface, &original_transform);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSvgGlyphStyle(ID2D1DeviceContext6 *iface,
