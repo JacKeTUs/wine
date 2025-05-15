@@ -3103,6 +3103,8 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         return;
     }
 
+    return;
+
     if (!layer) {
         D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
         d2d_device_context_CreateLayer(iface, &curSize, &layer);
@@ -3171,6 +3173,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         d2d_command_list_pop_layer(context->target.command_list);
         return;
     }
+    
+    return;
 
     struct d2d_layer entry;
     if (!d2d_layer_stack_pop(&context->layer_stack, &entry))
