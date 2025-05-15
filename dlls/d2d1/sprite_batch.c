@@ -92,58 +92,58 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
     TRACE("iface %p, batch %p, spriteCount %d, d %p, s %p, c %p, t %p, %d, %d, %d, %d\n", iface, batch, spriteCount, destinationRects, \
             sourceRects, colors, transforms, destinationRectanglesStride, sourceRectanglesStride, colorsStride, transformsStride);
 
-    if (!batch || !spriteCount || !destinationRects)
+    if (!batch || !spriteCount || !destinationRects) {
+        WARN("spriteCount or destrect null");
         return E_INVALIDARG;
+    }
 
     /* Expand storage if needed */
-    UINT32 newSize = batch->sprite_count + spriteCount;
-    if (newSize > batch->capacity)
-    {
-        UINT32 newCapacity = max(newSize, batch->capacity * 2);
+    UINT32 new_sprite_count = batch->sprite_count + spriteCount;
+    
+    struct d2d_sprite* new_sprites = realloc(batch->sprites, new_sprite_count*sizeof(struct d2d_sprite));
+    if (!new_sprites)
+        return E_OUTOFMEMORY;
+    batch->sprites = new_sprites;
+    
+    // "Zero" new sprite
+    D2D1_RECT_U inf = {0,0,INFINITY,INFINITY};
+    D2D1_COLOR_F color1={1.0f,1.0f,1.0f,1.0f};
+    D2D1_MATRIX_3X2_F identity =
+                                {{{
+                                    1.0f, 0.0f,
+                                    0.0f, 1.0f,
+                                    0.0f, 0.0f,
+                                }}};
+                                
+    /* Not efficient in memory, but most simple approach for now */
+    for (UINT32 i = batch->sprite_count; i < new_sprite_count; i++) {
 
-        batch->destinationRects = realloc(batch->destinationRects, newCapacity * sizeof(D2D1_RECT_F));
-        if (sourceRects) batch->sourceRects = realloc(batch->sourceRects, newCapacity * sizeof(D2D1_RECT_U));
-        if (colors) batch->colors = realloc(batch->colors, newCapacity * sizeof(D2D1_COLOR_F));
-        if (transforms) batch->transforms = realloc(batch->transforms, newCapacity * sizeof(D2D1_MATRIX_3X2_F));
+        //batch->sprites[i].sourceRect = inf;
+        //batch->sprites[i].color = color1;
+        //batch->sprites[i].transform = identity;
 
-        if (!batch->destinationRects || (sourceRects && !batch->sourceRects) ||
-            (colors && !batch->colors) || (transforms && !batch->transforms))
-        {
-            WARN("Out of memory when realloc");
-            return E_OUTOFMEMORY;
-        }
-            
-        batch->capacity = newCapacity;
-    }
-
-    UINT32 startIndex = batch->sprite_count;
-
-    /* Copy data */
-    for (UINT32 i = 0; i < spriteCount; i++)
-    {
-        UINT32 spriteIdx = startIndex + i;
-
-        batch->destinationRects[spriteIdx] =
-            destinationRectanglesStride ? *(const D2D1_RECT_F *)((const char *)destinationRects + i * destinationRectanglesStride)
-                                   : *destinationRects;
-
+        batch->sprites[i].destinationRect = *(const D2D1_RECT_F *)((const char *)destinationRects + 
+                                (i - batch->sprite_count) * destinationRectanglesStride);
         if (sourceRects)
-            batch->sourceRects[spriteIdx] =
-                sourceRectanglesStride ? *(const D2D1_RECT_U *)((const char *)sourceRects + i * sourceRectanglesStride)
-                                  : *sourceRects;
+            batch->sprites[i].sourceRect = *(const D2D1_RECT_U *)((const char *)sourceRects + 
+                                (i - batch->sprite_count) * sourceRectanglesStride);
+        else 
+            batch->sprites[i].sourceRect = inf;
 
         if (colors)
-            batch->colors[spriteIdx] =
-                colorsStride ? *(const D2D1_COLOR_F *)((const char *)colors + i * colorsStride)
-                             : *colors;
+            batch->sprites[i].color = *(const D2D1_COLOR_F *)((const char *)colors + 
+                                (i - batch->sprite_count) * colorsStride);
+        else 
+            batch->sprites[i].color = color1;
 
         if (transforms)
-            batch->transforms[spriteIdx] =
-                transformsStride ? *(const D2D1_MATRIX_3X2_F *)((const char *)transforms + i * transformsStride)
-                                 : *transforms;
+            batch->sprites[i].transform = *(const D2D1_MATRIX_3X2_F *)((const char *)transforms + 
+                                (i - batch->sprite_count) * transformsStride);
+        else
+            batch->sprites[i].transform = identity;
     }
-
-    batch->sprite_count = newSize;
+    
+    batch->sprite_count = new_sprite_count;
     return S_OK;
 }
 
@@ -160,87 +160,58 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_SetSprites(ID2D1SpriteBatch *i
     TRACE("iface %p, batch %p, start %d, count %d, d %p, s %p, c %p, t %p, %d, %d, %d, %d\n", iface, batch, startIndex, spriteCount, destinationRects, \
             sourceRects, colors, transforms, destinationRectanglesStride, sourceRectanglesStride, colorsStride, transformsStride);
     
-    /* Validation */
-    if (!batch || startIndex + spriteCount > batch->sprite_count)
+    if (!batch || startIndex + spriteCount > batch->sprite_count) {
+        WARN("wrong size");
         return E_INVALIDARG;
-
-    /* Allocate missing arrays if needed */
-    if (destinationRects && !batch->destinationRects) {
-        batch->destinationRects = calloc(batch->sprite_count, sizeof(D2D1_RECT_F));
-        if (!batch->destinationRects)
-            return E_OUTOFMEMORY;
-    }
-
-    if (sourceRects && !batch->sourceRects) {
-        batch->sourceRects = calloc(batch->sprite_count, sizeof(D2D1_RECT_U));
-        if (!batch->sourceRects)
-            return E_OUTOFMEMORY;
-    }
-
-    if (colors && !batch->colors) {
-        batch->colors = calloc(batch->sprite_count, sizeof(D2D1_COLOR_F));
-        if (!batch->colors)
-            return E_OUTOFMEMORY;
-    }
-
-    if (transforms && !batch->transforms) {
-        batch->transforms = calloc(batch->sprite_count, sizeof(D2D1_MATRIX_3X2_F));
-        if (!batch->transforms)
-            return E_OUTOFMEMORY;
     }
 
     /* Update only specified sprites */
-    for (UINT32 i = 0; i < spriteCount; i++)
+    for (UINT32 i = startIndex; i < spriteCount; i++)
     {
         UINT32 spriteIdx = startIndex + i;
 
-        /* Update destination rects if provided */
         if (destinationRects)
-            batch->destinationRects[spriteIdx] =
-                destinationRectanglesStride ? *(const D2D1_RECT_F *)((const char *)destinationRects + i * destinationRectanglesStride)
-                                       : *destinationRects;
-
-        /* Update source rects if provided */
+            batch->sprites[i].destinationRect = *(const D2D1_RECT_F *)((const char *)destinationRects + 
+                                (i - batch->sprite_count) * destinationRectanglesStride);
         if (sourceRects)
-            batch->sourceRects[spriteIdx] =
-                sourceRectanglesStride ? *(const D2D1_RECT_U *)((const char *)sourceRects + i * sourceRectanglesStride)
-                                       : *sourceRects;
-
-        /* Update colors if provided */
+            batch->sprites[i].sourceRect = *(const D2D1_RECT_U *)((const char *)sourceRects + 
+                                (i - batch->sprite_count) * sourceRectanglesStride);
         if (colors)
-            batch->colors[spriteIdx] =
-                colorsStride ? *(const D2D1_COLOR_F *)((const char *)colors + i * colorsStride)
-                             : *colors;
-
-        /* Update transforms if provided */
+            batch->sprites[i].color = *(const D2D1_COLOR_F *)((const char *)colors + 
+                                (i - batch->sprite_count) * colorsStride);
         if (transforms)
-            batch->transforms[spriteIdx] =
-                transformsStride ? *(const D2D1_MATRIX_3X2_F *)((const char *)transforms + i * transformsStride)
-                                 : *transforms;
+            batch->sprites[i].transform = *(const D2D1_MATRIX_3X2_F *)((const char *)transforms + 
+                                (i - batch->sprite_count) * transformsStride);
     }
 
     return S_OK;
 }
 
-static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_GetSprites(ID2D1SpriteBatch *iface, UINT32 start_index, UINT32 count,
-        D2D1_RECT_F *destination_rects, D2D1_RECT_U *source_rects,
+static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_GetSprites(ID2D1SpriteBatch *iface, UINT32 startIndex, UINT32 spriteCount,
+        D2D1_RECT_F *destinationRects, D2D1_RECT_U *sourceRects,
         D2D1_COLOR_F *colors, D2D1_MATRIX_3X2_F *transforms)
 {
-    struct d2d_sprite_batch *sprite_batch = impl_from_ID2D1SpriteBatch(iface);
+    struct d2d_sprite_batch *batch = impl_from_ID2D1SpriteBatch(iface);
     
-    TRACE("iface %p, %d, %d, %p, %p, %p, %p\n", iface, start_index, count, destination_rects, source_rects, colors, transforms);
+    TRACE("iface %p, %d, %d, %p, %p, %p, %p\n", iface, startIndex, spriteCount, destinationRects, sourceRects, colors, transforms);
     
-    if (!destination_rects || start_index + count > sprite_batch->sprite_count)
+    if (startIndex + spriteCount > batch->sprite_count) {
+        WARN("wrong size");
         return E_INVALIDARG;
+    }
 
-    memcpy(destination_rects, sprite_batch->destinationRects + start_index, count * sizeof(D2D1_RECT_F));
-    if (source_rects)
-        memcpy(source_rects, sprite_batch->sourceRects + start_index, count * sizeof(D2D1_RECT_U));
-    if (colors)
-        memcpy(colors, sprite_batch->colors + start_index, count * sizeof(D2D1_COLOR_F));
-    if (transforms)
-        memcpy(transforms, sprite_batch->transforms + start_index, count * sizeof(D2D1_MATRIX_3X2_F));
-
+    /* Get only specified sprites */
+    for (UINT32 i = startIndex; i < spriteCount; i++)
+    {
+        if (destinationRects)
+            destinationRects[i-startIndex] = batch->sprites[i].destinationRect;
+        if (sourceRects)
+            sourceRects[i-startIndex] = batch->sprites[i].sourceRect;
+        if (colors)
+            colors[i-startIndex] = batch->sprites[i].color;
+        if (transforms)
+            transforms[i-startIndex] = batch->sprites[i].transform;
+    }
     return S_OK;
 }
 
@@ -259,25 +230,13 @@ static UINT32 STDMETHODCALLTYPE d2d_sprite_batch_GetSpriteCount(ID2D1SpriteBatch
 static void STDMETHODCALLTYPE d2d_sprite_batch_Clear(ID2D1SpriteBatch *iface)
 {
     struct d2d_sprite_batch *batch = impl_from_ID2D1SpriteBatch(iface);
-    TRACE("iface %p\n", iface);
-    TRACE("batch %p\n", batch);
+    TRACE("iface %p batch %p\n", iface, batch);
     if (!batch) {
         WARN("NULL batch here\n");
         return;
     }
-
     /* Free allocated memory */
-    if (batch->destinationRects) free(batch->destinationRects);
-    if (batch->sourceRects) free(batch->sourceRects);
-    if (batch->colors) free(batch->colors);
-    if (batch->transforms) free(batch->transforms);
-
-    /* Set pointers to NULL to prevent dangling access */
-    batch->destinationRects = NULL;
-    batch->sourceRects = NULL;
-    batch->colors = NULL;
-    batch->transforms = NULL;
-
+    free(batch->sprites);
     batch->sprite_count = 0;
 }
 
@@ -303,6 +262,8 @@ HRESULT d2d_sprite_batch_create(ID2D1Factory *factory, struct d2d_sprite_batch *
 
     (*sprite_batch)->ID2D1SpriteBatch_iface.lpVtbl = &d2d_sprite_batch_vtbl;
     (*sprite_batch)->refcount = 1;
+    (*sprite_batch)->sprite_count = 0;
+    (*sprite_batch)->sprites = NULL;
     ID2D1Factory_AddRef((*sprite_batch)->factory = factory);
 
     TRACE("Created sprite batch %p.\n", *sprite_batch);
