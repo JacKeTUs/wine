@@ -137,11 +137,13 @@ static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
 
 static BOOL d2d_layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_layer *entry)
 {
+    struct d2d_layer e;
     if (!d2d_array_reserve((void **)&stack->layers, &stack->layer_capacity,
                            stack->layer_count + 1, sizeof(*stack->layers)))
         return FALSE;
 
-    stack->layers[stack->layer_count++] = *entry;
+    e = *entry;
+    stack->layers[stack->layer_count++] = e;
     return TRUE;
 }
 
@@ -3061,6 +3063,7 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
     {
         ID2D1Brush_SetOpacity((ID2D1Brush *)brush,
                                 layer->params.opacity);
+        
         if (layer->params.geometricMask)
         {
             ID2D1DeviceContext6_SetAntialiasMode(iface,
@@ -3143,7 +3146,9 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
         ID2D1DeviceContext6_SetAntialiasMode(iface,
                                            layer_parameters->maskAntialiasMode);
-    d2d_layer_stack_push(&context->layer_stack, layer_context);
+    if (!d2d_layer_stack_push(&context->layer_stack, layer_context)) {
+        ERR("Pushing layer failed\n");
+    }
 
     // For debugging, lets fill geometric mask if exists.
     /*
@@ -3170,6 +3175,23 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     struct d2d_layer entry;
     if (!d2d_layer_stack_pop(&context->layer_stack, &entry))
         return;
+
+
+     TRACE("pop layer bounds %f,%f %f,%f\n",
+            entry.params.contentBounds.left,
+            entry.params.contentBounds.top,
+            entry.params.contentBounds.right,
+            entry.params.contentBounds.bottom);
+
+    TRACE("layer geomask %p\n",
+            entry.params.geometricMask);
+    
+    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
+        entry.params.maskTransform._11,entry.params.maskTransform._12,
+        entry.params.maskTransform._21,entry.params.maskTransform._22,
+        entry.params.maskTransform._31,entry.params.maskTransform._32);
+
+
     ID2D1DeviceContext6_SetTarget(iface, entry.prev_target);
     ID2D1DeviceContext6_SetTransform(iface, &entry.saved_transform);
     d2d_device_context_composite_layer_bitmap(iface, &entry);
