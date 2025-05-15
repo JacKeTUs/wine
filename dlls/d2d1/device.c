@@ -1427,6 +1427,8 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
 
     transform = &context->drawing_state.transform;
 
+    TRACE("dpix %f dpiy %f\n", context->desc.dpiX, context->desc.dpiY);
+
     scale_x = context->desc.dpiX / 96.0f;
     m._11 = transform->_11 * scale_x;
     m._21 = transform->_21 * scale_x;
@@ -1452,6 +1454,10 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
     else
         texture_type = DWRITE_TEXTURE_CLEARTYPE_3x1;
 
+    TRACE("antialias_mode %#x\n", antialias_mode);
+    TRACE("rendering_mode %#x\n", rendering_mode);
+    TRACE("texture_type %#x\n", texture_type);
+
     if (FAILED(hr = IDWriteGlyphRunAnalysis_GetAlphaTextureBounds(analysis, texture_type, &bounds)))
     {
         ERR("Failed to get alpha texture bounds, hr %#lx.\n", hr);
@@ -1461,6 +1467,7 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
     d2d_size_set(&bitmap_size, bounds.right - bounds.left, bounds.bottom - bounds.top);
     if (!bitmap_size.width || !bitmap_size.height)
     {
+        ERR("EMPTY RUN!\n");
         /* Empty run, nothing to do. */
         goto done;
     }
@@ -1496,6 +1503,14 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
 
     d2d_rect_set(&run_rect, bounds.left / scale_x, bounds.top / scale_y,
             bounds.right / scale_x, bounds.bottom / scale_y);
+
+    D2D1_COLOR_F c = {1,0,0,1};
+    ID2D1SolidColorBrush *brbr;
+    d2d_device_context_CreateSolidColorBrush(&context->ID2D1DeviceContext6_iface,
+                                    &c, NULL, &brbr);
+    d2d_device_context_DrawRectangle(&context->ID2D1DeviceContext6_iface,
+                                    &run_rect,(ID2D1Brush*)brbr,2,NULL);
+    ID2D1Brush_Release((ID2D1Brush*)brbr);
 
     brush_desc.opacity = 1.0f;
     brush_desc.transform._11 = 1.0f;
@@ -1558,6 +1573,9 @@ static void d2d_device_context_draw_glyph_run(struct d2d_device_context *context
 
     rendering_mode = IDWriteRenderingParams_GetRenderingMode(rendering_params);
 
+    TRACE("textAntialiasMode %#x\n", context->drawing_state.textAntialiasMode);
+    TRACE("rendering_mode %#x\n", rendering_mode);
+
     switch (context->drawing_state.textAntialiasMode)
     {
         case D2D1_TEXT_ANTIALIAS_MODE_ALIASED:
@@ -1605,6 +1623,9 @@ static void d2d_device_context_draw_glyph_run(struct d2d_device_context *context
         default:
             break;
     }
+
+    TRACE("antialias_mode %#x\n", context->drawing_state.textAntialiasMode);
+    TRACE("rendering_mode %#x\n", rendering_mode);
 
     if (rendering_mode == DWRITE_RENDERING_MODE_DEFAULT)
     {
@@ -3173,7 +3194,6 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         d2d_command_list_pop_layer(context->target.command_list);
         return;
     }
-    
     return;
 
     struct d2d_layer entry;
@@ -3420,6 +3440,7 @@ static HRESULT STDMETHODCALLTYPE d2d_text_renderer_DrawGlyphRun(IDWriteTextRende
             "measuring_mode %#x, glyph_run %p, glyph_run_desc %p, effect %p.\n",
             iface, ctx, baseline_origin_x, baseline_origin_y,
             measuring_mode, glyph_run, glyph_run_desc, effect);
+    TRACE("options %#x\n", context->options);
 
     if (context->options & ~(D2D1_DRAW_TEXT_OPTIONS_NO_SNAP | D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT))
         FIXME("Ignoring options %#x.\n", context->options);
@@ -3427,7 +3448,6 @@ static HRESULT STDMETHODCALLTYPE d2d_text_renderer_DrawGlyphRun(IDWriteTextRende
     brush = d2d_draw_get_text_brush(context, effect);
 
     TRACE("%s\n", debugstr_wn(glyph_run_desc->string, glyph_run_desc->stringLength));
-
     if (context->options & D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT)
     {
         IDWriteFontFace2 *fontface;
