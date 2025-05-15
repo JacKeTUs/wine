@@ -3022,7 +3022,7 @@ static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *
         .pixelFormat = curForm,
         .dpiX = context->target.bitmap->dpi_x,
         .dpiY = context->target.bitmap->dpi_y,
-        .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET,
+        .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
         .colorContext = NULL
     };
     HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
@@ -3064,8 +3064,8 @@ static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface
         {
             ID2D1DeviceContext_SetAntialiasMode(iface,
                 layer->params.maskAntialiasMode);
-            ID2D1DeviceContext_SetTransform(iface,
-                &layer->params.maskTransform);
+            //ID2D1DeviceContext_SetTransform(iface,
+            //   &layer->params.maskTransform);
             ID2D1DeviceContext_FillGeometry(iface,
                 layer->params.geometricMask,
                 (ID2D1Brush *)brush, NULL);
@@ -3135,8 +3135,8 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         return;
     }
     ID2D1DeviceContext_SetTarget(iface, (ID2D1Image *)temp.bitmap);
-    ID2D1DeviceContext_SetTransform(iface,
-                                    &layer_parameters->maskTransform);
+    //ID2D1DeviceContext_SetTransform(iface,
+    //                                &layer_parameters->maskTransform);
     if (layer_parameters->maskAntialiasMode !=
         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
         ID2D1DeviceContext_SetAntialiasMode(iface,
