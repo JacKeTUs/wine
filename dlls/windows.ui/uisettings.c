@@ -217,7 +217,10 @@ DEFINE_IINSPECTABLE( uisettings2, IUISettings2, struct uisettings, IUISettings_i
 static HRESULT WINAPI uisettings2_get_TextScaleFactor( IUISettings2 *iface, DOUBLE *value )
 {
     FIXME( "iface %p, value %p stub!\n", iface, value );
-    if (value) *value = 1;
+    if (value) {
+        *value = 1;
+        return S_OK;
+    }
     return E_NOTIMPL;
 }
 
