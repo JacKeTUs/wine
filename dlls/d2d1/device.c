@@ -3171,8 +3171,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     ID2D1DeviceContext_SetTarget(iface, entry.prev_target);
     ID2D1DeviceContext_SetTransform(iface, &entry.saved_transform);
     d2d_device_context_composite_layer_bitmap(iface, &entry);
-    ID2D1Bitmap1_Release(entry.bitmap);
-    ID2D1Bitmap1_Release(entry.prev_target);
+    ID2D1Bitmap_Release(entry.bitmap);
+    ID2D1Bitmap_Release(entry.prev_target);
     if (entry.params.geometricMask)
         ID2D1Geometry_Release(entry.params.geometricMask);
 }
