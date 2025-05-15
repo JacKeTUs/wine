@@ -65,8 +65,8 @@ extern struct d2d_settings d2d_settings;
 struct d2d_layer_stack
 {
     struct d2d_layer *layers;
-    UINT layer_count;
-    UINT layer_capacity;
+    size_t layer_count;
+    size_t layer_capacity;
 };
 
 struct d2d_clip_stack
