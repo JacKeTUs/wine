@@ -3004,7 +3004,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
         d2d_device_context_CreateLayer(iface, &curSize, &layer);
     }
-    struct d2d_layer *layer_context = impl_from_ID2D1Layer(layer);
+    struct d2d_layer *layer_context = CONTAINING_RECORD(layer, struct d2d_layer, ID2D1Layer_iface);
 
     TRACE("layer bounds %f,%f %f,%f\n",
             layer_parameters->contentBounds.left,
