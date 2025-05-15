@@ -2896,8 +2896,13 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         d2d_rect_expand(&transformed_rect, &point);
 
 
-        /* Draw the bitmap into sprite */
-        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, batch->sprites[i].color.a, interpolation_mode, &batch->sprites[i].sourceRect);
+        D2D1_RECT_F src_rect_f;
+        src_rect_f.left   = (FLOAT)batch->sprites[i].sourceRect.left;
+        src_rect_f.top    = (FLOAT)batch->sprites[i].sourceRect.top;
+        src_rect_f.right  = (FLOAT)batch->sprites[i].sourceRect.right;
+        src_rect_f.bottom = (FLOAT)batch->sprites[i].sourceRect.bottom;
+
+        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, batch->sprites[i].color.a, interpolation_mode, &src_rect_f);
     }
 }
 

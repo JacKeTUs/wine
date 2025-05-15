@@ -106,7 +106,8 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
     batch->sprites = new_sprites;
     
     // "Zero" new sprite
-    D2D1_RECT_U inf = {0,0,INFINITY,INFINITY};
+    D2D1_RECT_U inf = {0,0,UINT_MAX,UINT_MAX};
+
     D2D1_COLOR_F color1={1.0f,1.0f,1.0f,1.0f};
     D2D1_MATRIX_3X2_F identity =
                                 {{{
@@ -141,6 +142,7 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
                                 (i - batch->sprite_count) * transformsStride);
         else
             batch->sprites[i].transform = identity;
+            
     }
     
     batch->sprite_count = new_sprite_count;
