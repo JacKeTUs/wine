@@ -118,6 +118,41 @@ static void d2d_clip_stack_pop(struct d2d_clip_stack *stack)
 
 
 
+static BOOL layer_stack_init(struct d2d_layer_stack *stack)
+{
+    stack->layer_capacity = 0;
+    stack->layer_count = 0;
+    stack->layers = NULL;
+    return d2d_array_reserve((void **)&stack->layers, &stack->layer_capacity, 1, sizeof(*stack->layers))
+        ? TRUE : FALSE;
+}
+
+static void layer_stack_free(struct d2d_layer_stack *stack)
+{
+    free(stack->layers);
+    stack->layers = NULL;
+    stack->layer_capacity = 0;
+    stack->layer_count = 0;
+}
+
+static BOOL layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_layer *entry)
+{
+    if (!d2d_array_reserve((void **)&stack->layers, &stack->layer_capacity,
+                           stack->layer_count + 1, sizeof(*stack->layers)))
+        return FALSE;
+
+    stack->layers[stack->layer_count++] = *entry;
+    return TRUE;
+}
+
+static layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer *out)
+{
+    if (!stack->layer_count)
+        return;
+    *out = stack->layers[--stack->layer_count];
+}
+
+
 static void d2d_device_context_draw(struct d2d_device_context *render_target, enum d2d_shape_type shape_type,
         ID3D11Buffer *ib, unsigned int index_count, ID3D11Buffer *vb, unsigned int vb_stride,
         struct d2d_brush *brush, struct d2d_brush *opacity_brush)
@@ -2973,6 +3008,83 @@ static void STDMETHODCALLTYPE d2d_device_context_BlendImage(ID2D1DeviceContext6 
             interpolation_mode);
 }
 
+
+static HRESULT d2d_device_context_create_temp_layer_bitmap(ID2D1DeviceContext6 *iface,
+                                                            const D2D1_RECT_F *bounds,
+                                                            ID2D1Bitmap1 **out_bitmap)
+{
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    D2D1_SIZE_U size = { (UINT32)(bounds->right - bounds->left),
+                         (UINT32)(bounds->bottom - bounds->top) };
+    D2D1_PIXEL_FORMAT curForm = { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED };
+    D2D1_BITMAP_PROPERTIES1 props = {
+        .pixelFormat = curForm,
+        .dpiX = context->target.bitmap->dpi_x,
+        .dpiY = context->target.bitmap->dpi_y,
+        .bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET,
+        .colorContext = NULL
+    };
+    HRESULT hr = ID2D1DeviceContext_CreateBitmap(iface,
+                                           size, NULL, 0, &props, out_bitmap);
+    if (hr != S_OK) {
+        ERR("Create bitmap failed: %x\n", hr);
+    }
+    return hr;
+}
+
+
+static void d2d_device_context_composite_layer_bitmap(ID2D1DeviceContext6 *iface,
+                                   const struct d2d_layer *layer)
+{
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+
+    ID2D1DeviceContext_SetTransform(iface, &layer->saved_transform);
+
+    D2D1_RECT_F cb = layer->params.contentBounds;
+    if (cb.right > cb.left && cb.bottom > cb.top)
+        ID2D1DeviceContext_PushAxisAlignedClip(iface, &cb,
+                                              D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
+    D2D1_BITMAP_BRUSH_PROPERTIES bmp_props = {
+        .extendModeX = D2D1_EXTEND_MODE_CLAMP,
+        .extendModeY = D2D1_EXTEND_MODE_CLAMP,
+        .interpolationMode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
+    };
+    ID2D1BitmapBrush1 *brush;
+    HRESULT hr;
+    hr = ID2D1DeviceContext_CreateBitmapBrush(iface, layer->bitmap,
+                                                &bmp_props, NULL,
+                                                &brush);
+    if (hr == S_OK)
+    {
+        ID2D1Brush_SetOpacity((ID2D1Brush *)brush,
+                                layer->params.opacity);
+        if (layer->params.geometricMask)
+        {
+            ID2D1DeviceContext_SetAntialiasMode(iface,
+                layer->params.maskAntialiasMode);
+            ID2D1DeviceContext_SetTransform(iface,
+                &layer->params.maskTransform);
+            ID2D1DeviceContext_FillGeometry(iface,
+                layer->params.geometricMask,
+                (ID2D1Brush *)brush, NULL);
+        }
+        else
+        {
+            ID2D1DeviceContext_FillRectangle(iface,
+                &layer->params.contentBounds,
+                (ID2D1Brush *)brush);
+        }
+        ID2D1BitmapBrush1_Release(brush);
+    }
+    else {
+        ERR("Create bitmap brush failed: %x\n", hr);
+        return;
+    }
+    if (cb.right > cb.left && cb.bottom > cb.top)
+        ID2D1DeviceContext_PopAxisAlignedClip(iface);
+}
+
 static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID2D1DeviceContext6 *iface,
         const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer)
 {
@@ -2983,23 +3095,8 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
     {
         d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
+        return;
     }
-    
-    TRACE("layer bounds %f,%f %f,%f\n",
-            layer_parameters->contentBounds.left,
-            layer_parameters->contentBounds.bottom,
-            layer_parameters->contentBounds.right,
-            layer_parameters->contentBounds.top);
-
-    TRACE("layer geomask %p\n",
-            layer_parameters->geometricMask);
-    
-    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
-        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
-        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
-        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
-
-
 
     if (!layer) {
         D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
@@ -3021,45 +3118,37 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
         layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
         layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
 
-    /*
-    // Create empty layer bitmap and set it as target
-    HRESULT hr;
-    D2D1_SIZE_U curSize = {context->pixel_size.width,context->pixel_size.height};
-    D2D1_BITMAP_PROPERTIES1 curProp;
-    curProp.dpiX = context->target.bitmap->dpi_x;
-    curProp.dpiY = context->target.bitmap->dpi_y;
-    D2D1_PIXEL_FORMAT curForm = { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE };
-    curProp.pixelFormat = curForm;
-    curProp.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
 
-    ID2D1Bitmap1 *old_bitmap;
-    ID2D1Bitmap1 *new_bitmap;
-    hr = d2d_device_context_CreateBitmap(
-            iface,
-            curSize,
-            NULL, 0,
-            &curProp,
-        &new_bitmap);
-    
-    d2d_device_context_GetTarget(iface, &old_bitmap);
-    d2d_device_context_SetTarget(iface, (ID2D1Image*)new_bitmap);
-
-    layer_context->bitmap = old_bitmap;
-    layer_context->layer_parameters = layer_parameters;
-    layer_context->prev = (void*)context->layers_head;
-    context->layers_head = layer_context;
-*/
+    ID2D1Bitmap1 *old;
+    struct d2d_layer temp;
+    temp.params = *layer_parameters;
+    ID2D1DeviceContext_GetTarget(iface, (ID2D1Image **)&old);
+    temp.prev_target = old;
+    ID2D1DeviceContext_GetTransform(iface, &temp.saved_transform);
+    if (FAILED(d2d_device_context_create_temp_layer_bitmap(iface,
+                                       &layer_parameters->contentBounds,
+                                       &temp.bitmap))) {
+        ERR("Create temp layer bitmap failed\n");
+        return;
+    }
+    ID2D1DeviceContext_SetTarget(iface, (ID2D1Image *)temp.bitmap);
+    ID2D1DeviceContext_SetTransform(iface,
+                                    &layer_parameters->maskTransform);
+    if (layer_parameters->maskAntialiasMode !=
+        D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
+        ID2D1DeviceContext_SetAntialiasMode(iface,
+                                           layer_parameters->maskAntialiasMode);
+    layer_stack_push(&context->layer_stack, &temp);
 
     // For debugging, lets fill geometric mask if exists.
+    /*
     if (layer_parameters->geometricMask) {
         ID2D1BitmapBrush *brush;
         ID2D1DeviceContext_CreateBitmapBrush(iface, context->target.bitmap, NULL, NULL, &brush);
         //ID2D1DeviceContext_CreateSolidColorBrush(iface, &brush_color,NULL, &brush);
         ID2D1DeviceContext_FillGeometry(iface, layer_parameters->geometricMask, brush, NULL);
         ID2D1BitmapBrush_Release(brush);
-    }
-
-    ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
+    }*/
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
@@ -3068,31 +3157,21 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     FIXME("iface %p stub!\n", iface);
 
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_pop_layer(context->target.command_list);
-
-    // Clip
-    ID2D1DeviceContext_PopAxisAlignedClip(iface);
-/*
-    // Get bitmap from current target
-
-    ID2D1Bitmap1 *new_bitmap;
-    d2d_device_context_GetTarget(iface, &new_bitmap);
-
-    struct d2d_layer *popped_layer = context->layers_head;
-    if (!popped_layer) {
-        WARN("Layer stack empty!\n");
         return;
     }
-    context->layers_head = popped_layer->prev;
-    
-    d2d_device_context_SetTarget(iface, (ID2D1Image*)popped_layer->bitmap);
-    d2d_device_context_DrawBitmap(iface,new_bitmap,NULL,
-        popped_layer->layer_parameters->opacity,
-        D2D1_INTERPOLATION_MODE_LINEAR,NULL);
-    ID2D1Bitmap1_Release(new_bitmap);
-    ID2D1Layer *layer = &popped_layer->ID2D1Layer_iface;
-    ID2D1Layer_Release(layer);*/
+
+    struct d2d_layer entry;
+    if (!layer_stack_pop(&context->layer_stack, &entry))
+        return;
+    ID2D1DeviceContext_SetTarget(iface, entry.prev_target);
+    ID2D1DeviceContext_SetTransform(iface, &entry.saved_transform);
+    d2d_device_context_composite_layer_bitmap(iface, &entry);
+    ID2D1Bitmap1_Release(entry.bitmap);
+    ID2D1Bitmap1_Release(entry.prev_target);
+    if (entry.params.geometricMask)
+        ID2D1Geometry_Release(entry.params.geometricMask);
 }
 
 static const struct ID2D1DeviceContext6Vtbl d2d_device_context_vtbl =

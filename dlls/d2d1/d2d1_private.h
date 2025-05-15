@@ -62,6 +62,13 @@ struct d2d_settings
 };
 extern struct d2d_settings d2d_settings;
 
+struct d2d_layer_stack
+{
+    struct d2d_layer *layers;
+    UINT layer_count;
+    UINT layer_capacity;
+};
+
 struct d2d_clip_stack
 {
     D2D1_RECT_F *stack;
@@ -220,10 +227,11 @@ struct d2d_device_context
     D2D1_RENDER_TARGET_PROPERTIES desc;
     D2D1_SIZE_U pixel_size;
     struct d2d_clip_stack clip_stack;
+    struct d2d_layer_stack layer_stack;
 
     struct d2d_indexed_objects vertex_buffers;
 
-    struct d2d_layer* layers_head;
+    
 };
 
 HRESULT d2d_d3d_create_render_target(struct d2d_device *device, IDXGISurface *surface, IUnknown *outer_unknown,
@@ -409,16 +417,16 @@ struct d2d_layer
 
     ID2D1Factory *factory;
 
-    ID2D1Bitmap1 *bitmap;
-    D2D1_LAYER_PARAMETERS *layer_parameters;
+    ID2D1Bitmap *bitmap;
+    ID2D1Bitmap *prev_target;
+    D2D1_MATRIX_3X2_F saved_transform;
 
-    void* prev;
+    D2D1_LAYER_PARAMETERS1 params;
 
     D2D1_SIZE_F size;
 };
 
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
-
 
 
 
