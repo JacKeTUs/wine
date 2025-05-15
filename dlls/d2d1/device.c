@@ -3051,11 +3051,11 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 
     // For debugging, lets fill geometric mask if exists.
     if (layer_parameters->geometricMask) {
-        D2D1_COLOR_F brush_color = {0.0f, 0.0f, 0.5f, 1.0};
-        ID2D1SolidColorBrush *brush;
-        ID2D1DeviceContext_CreateSolidColorBrush(iface, &brush_color,NULL, &brush);
+        ID2D1BitmapBrush *brush;
+        ID2D1DeviceContext_CreateBitmapBrush(iface, context->target.bitmap, NULL, NULL, &brush);
+        //ID2D1DeviceContext_CreateSolidColorBrush(iface, &brush_color,NULL, &brush);
         ID2D1DeviceContext_FillGeometry(iface, layer_parameters->geometricMask, brush, NULL);
-        ID2D1SolidColorBrush_Release(brush);
+        ID2D1BitmapBrush_Release(brush);
     }
 
     ID2D1DeviceContext_PushAxisAlignedClip(iface, &layer_parameters->contentBounds, layer_parameters->maskAntialiasMode);
