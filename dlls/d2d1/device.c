@@ -3063,21 +3063,26 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     }
     struct d2d_layer *new_layer = CONTAINING_RECORD(layer, struct d2d_layer, ID2D1Layer_iface);
 
+    new_layer->params = *layer_parameters;
+
     TRACE("layer bounds %f,%f %f,%f\n",
-            layer_parameters->contentBounds.left,
-            layer_parameters->contentBounds.top,
-            layer_parameters->contentBounds.right,
-            layer_parameters->contentBounds.bottom);
+            new_layer->params.contentBounds.left,
+            new_layer->params.contentBounds.top,
+            new_layer->params.contentBounds.right,
+            new_layer->params.contentBounds.bottom);
 
     TRACE("layer geomask %p\n",
-            layer_parameters->geometricMask);
+            new_layer->params.geometricMask);
     
     TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
-        layer_parameters->maskTransform._11,layer_parameters->maskTransform._12,
-        layer_parameters->maskTransform._21,layer_parameters->maskTransform._22,
-        layer_parameters->maskTransform._31,layer_parameters->maskTransform._32);
+        new_layer->params.maskTransform._11,new_layer->params.maskTransform._12,
+        new_layer->params.maskTransform._21,new_layer->params.maskTransform._22,
+        new_layer->params.maskTransform._31,new_layer->params.maskTransform._32);
 
-    new_layer->params = *layer_parameters;
+    TRACE("layer opacity\t%f\topacity_brush\t%p\n",
+        new_layer->params.opacity,new_layer->params.opacityBrush);
+    TRACE("layer maskAntialiasMode\t%d\toptions\t%#x\n",
+        new_layer->params.maskAntialiasMode,new_layer->params.layerOptions);
 
     FLOAT dpiX, dpiY;
     d2d_device_context_GetDpi(iface, &dpiX, &dpiY);
@@ -3085,13 +3090,13 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     d2d_device_context_GetTarget(iface, &new_layer->prev_target);
 
     d2d_device_context_GetPixelSize(iface, &new_layer->pixel_size);
-    
+
     D2D1_BITMAP_PROPERTIES1 props;
     
     props.dpiX = dpiX;
     props.dpiY = dpiY;
     props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_STRAIGHT;
     props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
 
     d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
