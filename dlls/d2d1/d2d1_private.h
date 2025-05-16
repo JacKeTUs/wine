@@ -422,6 +422,7 @@ struct d2d_layer
     ID2D1Image *prev_target;
     ID2D1Bitmap1 *offscreen_bitmap;
 
+    D2D1_MATRIX_3X2_F prev_transform;
     D2D1_SIZE_F size;
 };
 
