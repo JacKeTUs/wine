@@ -3148,6 +3148,9 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     TRACE("stack size now is %I64d\n", context->layer_stack.count);
 
     d2d_device_context_SetTarget(iface, top_layer.prev_target);
+
+    D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
+    d2d_device_context_GetTransform(iface, &current_transform);
     d2d_device_context_SetTransform(iface, &top_layer.prev_transform);
     
     TRACE("SetTarget successfull\n");
@@ -3212,6 +3215,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     TRACE("d2d_device_context_FillGeometry successfull\n");    
     
+    d2d_device_context_SetTransform(iface, &current_transform);
+
     TRACE("Cleaning\n");
     ID2D1Geometry_Release(geometry);
 
@@ -3220,6 +3225,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     ID2D1BitmapBrush_Release(imageBrush);
     ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
+
     TRACE("Cleaning done\n");
 }
 
