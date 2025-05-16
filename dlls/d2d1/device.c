@@ -3086,18 +3086,22 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 
     d2d_device_context_GetPixelSize(iface, &new_layer->pixel_size);
     
-    D2D1_BITMAP_PROPERTIES props = {
-        D2D1_BITMAP_OPTIONS_TARGET,
-        {DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED},
-        dpiX, dpiY
-    };
+    D2D1_BITMAP_PROPERTIES1 props;
+    
+    props.dpiX = dpiX;
+    props.dpiY = dpiY;
+    props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+    props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
 
-    d2d_device_context_CreateBitmap(iface,
-        {new_layer->pixelSize.width, new_layer->pixelSize.height},
-        NULL, 0,
-        &props, &new_layer->offscreen_bitmap
+    d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
+        new_layer->pixel_size,
+        NULL,0,
+        &props,
+        &new_layer->offscreen_bitmap
     );
-    d2d_device_context_SetTarget(iface, new_layer->offscreen_bitmap);
+
+    d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
 
     d2d_layer_stack_push(&context->layer_stack, new_layer);
 }
@@ -3132,17 +3136,14 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     bp.transform = identity;
 
     d2d_device_context_CreateBitmapBrush(iface,
-        top_layer.offscreen_bitmap,
+        (ID2D1Bitmap*)top_layer.offscreen_bitmap,
         &bbp, &bp,
         &imageBrush);
 
     // Apply clip geometry and draw
-    D2D1_RECT_F contentBounds;
-    contentBounds = top_layer.params.contentBounds;
-
     D2D1_SIZE_F size;
     D2D1_RECT_F destination_bounds;
-    size = ID2D1Bitmap_GetSize(&size);
+    size = ID2D1Bitmap1_GetSize(top_layer.offscreen_bitmap);
     d2d_rect_set(&destination_bounds, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_intersect(&destination_bounds, &top_layer.params.contentBounds);
 
@@ -3161,13 +3162,15 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
             &destination_bounds,
             (ID2D1RectangleGeometry**)&geometry);
     }
-    d2d_device_context_FillGeometry(iface, geometry, imageBrush, top_layer.params.opacityBrush);
+    d2d_device_context_FillGeometry(iface, 
+        geometry,
+        (ID2D1Brush*)imageBrush, top_layer.params.opacityBrush);
     ID2D1Geometry_Release(geometry);
 
     d2d_device_context_PopAxisAlignedClip(iface);
 
     ID2D1BitmapBrush_Release(imageBrush);
-    ID2D1Bitmap_Release(top_layer.offscreen_bitmap);
+    ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
 }
 
