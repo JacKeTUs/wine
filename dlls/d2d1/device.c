@@ -249,6 +249,7 @@ static void d2d_device_context_draw(struct d2d_device_context *render_target, en
 
 static void d2d_device_context_set_error(struct d2d_device_context *context, HRESULT code)
 {
+    ERR("c %p code %lx\n", context, code);
     context->error.code = code;
     context->error.tag1 = context->drawing_state.tag1;
     context->error.tag2 = context->drawing_state.tag2;
@@ -3049,7 +3050,7 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
-    TRACE("We're now here\n");
+    HRESULT hr = S_OK;
 
     if (!layer) {
         D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
@@ -3059,16 +3060,16 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
     new_layer->params = *layer_parameters;
 
-    TRACE("layer bounds %f,%f %f,%f\n",
-            new_layer->params.contentBounds.left,
-            new_layer->params.contentBounds.top,
-            new_layer->params.contentBounds.right,
-            new_layer->params.contentBounds.bottom);
+    // Ignore opacityBrush for now
+    new_layer->params.opacityBrush = NULL;
+    TRACE("Setting opacityBrush to NULL for debugging\n");
+
+    TRACE("layer bounds %s\n",debug_d2d_rect_f(&new_layer->params.contentBounds));
 
     TRACE("layer geomask %p\n",
             new_layer->params.geometricMask);
     
-    TRACE("layer maskTransform\n%f\t%f\n%f\t%f\n%f\t%f\n",
+    TRACE("layer maskTransform\t%f\t%f\t%f\t%f\t%f\t%f\n",
         new_layer->params.maskTransform._11,new_layer->params.maskTransform._12,
         new_layer->params.maskTransform._21,new_layer->params.maskTransform._22,
         new_layer->params.maskTransform._31,new_layer->params.maskTransform._32);
@@ -3080,10 +3081,10 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
     FLOAT dpiX, dpiY;
     d2d_device_context_GetDpi(iface, &dpiX, &dpiY);
-    
+    TRACE("dpi: %f\t%f\n", dpiX,dpiY);
+
     d2d_device_context_GetTarget(iface, &new_layer->prev_target);
     d2d_device_context_GetTransform(iface, &new_layer->prev_transform);
-
     d2d_device_context_GetPixelSize(iface, &new_layer->pixel_size);
 
     D2D1_BITMAP_PROPERTIES1 props;
@@ -3094,12 +3095,17 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
     props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
 
-    d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
+    hr = d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
         new_layer->pixel_size,
         NULL,0,
         &props,
         &new_layer->offscreen_bitmap
     );
+
+    if (hr != S_OK) {
+        ERR("Create offscreen bitmap failed!");
+        return;
+    }
 
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
     d2d_device_context_SetTransform(iface, &identity);
@@ -3111,7 +3117,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         d2d_device_context_Clear(iface, &transparentBlack);
     }
 
-    d2d_layer_stack_push(&context->layer_stack, new_layer);
+    if (!d2d_layer_stack_push(&context->layer_stack, new_layer)) {
+        ERR("Stack push failed");
+    }
 }
 
 
@@ -3173,7 +3181,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         &bbp, &bp,
         &imageBrush);
     if (hr != S_OK) {
-        WARN("CreateBitmapBrush failed\n");
+        ERR("CreateBitmapBrush failed\n");
         return;
     } else {
         TRACE("CreateBitmapBrush successfull\n");
@@ -3186,9 +3194,12 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     d2d_rect_set(&destination_bounds, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_intersect(&destination_bounds, &top_layer.params.contentBounds);
 
+    TRACE("contentBounds: %s\n", debug_d2d_rect_f(&top_layer.params.contentBounds));
+    TRACE("size of offscreen bitmap: %f, %f\n", size.width, size.height);
+    TRACE("destination: %s\n", debug_d2d_rect_f(&destination_bounds));
+
     //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
     //     top_layer.params.maskAntialiasMode);
-    TRACE("PushAxisAlignedClip successfull\n");
     
     ID2D1Geometry* geometry;
     if (top_layer.params.geometricMask) {
@@ -3198,12 +3209,13 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
             (ID2D1TransformedGeometry**)&geometry
         );
     } else {
+        TRACE("Rectangle: %s\n", debug_d2d_rect_f(&destination_bounds));
         hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
             &destination_bounds,
             (ID2D1RectangleGeometry**)&geometry);
     }
     if (hr != S_OK) {
-        WARN("CreateGeometry failed\n");
+        ERR("CreateGeometry failed\n");
         return;
     } else {
         TRACE("CreateGeometry successfull\n");
@@ -3223,6 +3235,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     //d2d_device_context_PopAxisAlignedClip(iface);
 
     ID2D1BitmapBrush_Release(imageBrush);
+    ID2D1Image_Release(top_layer.prev_target);
     ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
 
