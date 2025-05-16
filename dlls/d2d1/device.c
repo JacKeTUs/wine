@@ -3090,7 +3090,7 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     props.dpiX = dpiX;
     props.dpiY = dpiY;
     props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
     props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
 
     d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
@@ -3101,6 +3101,13 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     );
 
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
+
+    if (new_layer->params.layerOptions & D2D1_LAYER_OPTIONS_INITIALIZE_FOR_CLEARTYPE)
+    {
+        TRACE("Initializing just for Cleartype\n");
+        D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
+        d2d_device_context_Clear(iface, &transparentBlack);
+    }
 
     d2d_layer_stack_push(&context->layer_stack, new_layer);
 }
