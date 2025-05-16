@@ -3082,6 +3082,7 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     d2d_device_context_GetDpi(iface, &dpiX, &dpiY);
     
     d2d_device_context_GetTarget(iface, &new_layer->prev_target);
+    d2d_device_context_GetTransform(iface, &new_layer->prev_transform);
 
     d2d_device_context_GetPixelSize(iface, &new_layer->pixel_size);
 
@@ -3101,6 +3102,7 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     );
 
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
+    d2d_device_context_SetTransform(iface, &identity);
 
     if (new_layer->params.layerOptions & D2D1_LAYER_OPTIONS_INITIALIZE_FOR_CLEARTYPE)
     {
@@ -3146,7 +3148,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     TRACE("stack size now is %I64d\n", context->layer_stack.count);
 
     d2d_device_context_SetTarget(iface, top_layer.prev_target);
-
+    d2d_device_context_SetTransform(iface, &top_layer.prev_transform);
+    
     TRACE("SetTarget successfull\n");
 
     ID2D1BitmapBrush* imageBrush;
