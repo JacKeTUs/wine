@@ -3143,7 +3143,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     struct d2d_layer top_layer;
     d2d_layer_stack_pop(&context->layer_stack, &top_layer);
 
-    TRACE("stack size now is %lld\n", context->layer_stack.count);
+    TRACE("stack size now is %ld\n", context->layer_stack.count);
 
     d2d_device_context_SetTarget(iface, top_layer.prev_target);
 
