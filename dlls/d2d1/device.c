@@ -3186,8 +3186,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     d2d_rect_set(&destination_bounds, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_intersect(&destination_bounds, &top_layer.params.contentBounds);
 
-    d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
-         top_layer.params.maskAntialiasMode);
+    //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
+    //     top_layer.params.maskAntialiasMode);
     TRACE("PushAxisAlignedClip successfull\n");
     
     ID2D1Geometry* geometry;
@@ -3220,7 +3220,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     TRACE("Cleaning\n");
     ID2D1Geometry_Release(geometry);
 
-    d2d_device_context_PopAxisAlignedClip(iface);
+    //d2d_device_context_PopAxisAlignedClip(iface);
 
     ID2D1BitmapBrush_Release(imageBrush);
     ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
