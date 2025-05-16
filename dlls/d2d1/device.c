@@ -1808,6 +1808,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_push_layer(context->target.command_list, context, &parameters, layer);
 
+    d2d_device_context_push_layer_impl(iface, &parameters, layer);
 }
 
 
@@ -3044,18 +3045,11 @@ static void STDMETHODCALLTYPE d2d_device_context_BlendImage(ID2D1DeviceContext6 
 }
 
 
-static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID2D1DeviceContext6 *iface,
+static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
-
-    FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
-
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
-    {
-        d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
-        return;
-    }
+    TRACE("We're now here\n");
 
     if (!layer) {
         D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
@@ -3096,7 +3090,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     props.dpiX = dpiX;
     props.dpiY = dpiY;
     props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_STRAIGHT;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
     props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
 
     d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
@@ -3111,11 +3105,28 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
     d2d_layer_stack_push(&context->layer_stack, new_layer);
 }
 
-static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
+
+static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID2D1DeviceContext6 *iface,
+        const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    FIXME("iface %p stub!\n", iface);
+    FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
+
+    if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    {
+        d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
+        return;
+    }
+
+    d2d_device_context_push_layer_impl(iface, layer_parameters, layer);
+}
+
+static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *iface)
+{
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    HRESULT hr = S_OK;
+    FIXME("WIP iface %p stub!\n", iface);
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_pop_layer(context->target.command_list);
@@ -3125,7 +3136,11 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     struct d2d_layer top_layer;
     d2d_layer_stack_pop(&context->layer_stack, &top_layer);
 
+    TRACE("stack size now is %lld\n", context->layer_stack.count);
+
     d2d_device_context_SetTarget(iface, top_layer.prev_target);
+
+    TRACE("SetTarget successfull\n");
 
     ID2D1BitmapBrush* imageBrush;
 
@@ -3140,10 +3155,16 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     bp.opacity = top_layer.params.opacity;
     bp.transform = identity;
 
-    d2d_device_context_CreateBitmapBrush(iface,
+    hr = d2d_device_context_CreateBitmapBrush(iface,
         (ID2D1Bitmap*)top_layer.offscreen_bitmap,
         &bbp, &bp,
         &imageBrush);
+    if (hr != S_OK) {
+        WARN("CreateBitmapBrush failed\n");
+        return;
+    } else {
+        TRACE("CreateBitmapBrush successfull\n");
+    }
 
     // Apply clip geometry and draw
     D2D1_SIZE_F size;
@@ -3154,22 +3175,34 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
          top_layer.params.maskAntialiasMode);
+    TRACE("PushAxisAlignedClip successfull\n");
     
     ID2D1Geometry* geometry;
     if (top_layer.params.geometricMask) {
-        ID2D1Factory_CreateTransformedGeometry(context->factory,
+        hr = ID2D1Factory_CreateTransformedGeometry(context->factory,
             top_layer.params.geometricMask,
             &top_layer.params.maskTransform,
             (ID2D1TransformedGeometry**)&geometry
         );
     } else {
-        ID2D1Factory_CreateRectangleGeometry(context->factory,
+        hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
             &destination_bounds,
             (ID2D1RectangleGeometry**)&geometry);
     }
+    if (hr != S_OK) {
+        WARN("CreateGeometry failed\n");
+        return;
+    } else {
+        TRACE("CreateGeometry successfull\n");
+    }
+
     d2d_device_context_FillGeometry(iface, 
         geometry,
         (ID2D1Brush*)imageBrush, top_layer.params.opacityBrush);
+
+    TRACE("d2d_device_context_FillGeometry successfull\n");    
+    
+    TRACE("Cleaning\n");
     ID2D1Geometry_Release(geometry);
 
     d2d_device_context_PopAxisAlignedClip(iface);
@@ -3177,6 +3210,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     ID2D1BitmapBrush_Release(imageBrush);
     ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
+    TRACE("Cleaning done\n");
 }
 
 static const struct ID2D1DeviceContext6Vtbl d2d_device_context_vtbl =
