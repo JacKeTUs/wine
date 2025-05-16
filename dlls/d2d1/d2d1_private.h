@@ -64,9 +64,9 @@ extern struct d2d_settings d2d_settings;
 
 struct d2d_layer_stack
 {
-    struct d2d_layer *layers;
-    size_t layer_count;
-    size_t layer_capacity;
+    struct d2d_layer *stack;
+    size_t size;
+    size_t count;
 };
 
 struct d2d_clip_stack
@@ -417,11 +417,10 @@ struct d2d_layer
 
     ID2D1Factory *factory;
 
-    ID2D1Bitmap1 *bitmap;
-    ID2D1Image *prev_target;
-    D2D1_MATRIX_3X2_F saved_transform;
-
     D2D1_LAYER_PARAMETERS1 params;
+    D2D1_SIZE_U pixel_size;
+    ID2D1Image *prev_target;
+    ID2D1Bitmap1 *offscreen_bitmap;
 
     D2D1_SIZE_F size;
 };
