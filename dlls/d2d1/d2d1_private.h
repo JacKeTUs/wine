@@ -426,7 +426,8 @@ struct d2d_layer
 };
 
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
-
+static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface, 
+        const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer);
 
 
 struct d2d_mesh
