@@ -1900,47 +1900,8 @@ static HRESULT STDMETHODCALLTYPE d2d_effect_QueryInterface(ID2D1Effect *iface, R
     if (IsEqualGUID(iid, &IID_ID2D1Image)
             || IsEqualGUID(iid, &IID_ID2D1Resource))
     {
-        //ID2D1Image_AddRef(&effect->ID2D1Image_iface);
-        //*out = &effect->ID2D1Image_iface;
-
-        FIXME("HACK2\n");
-        if (effect->input_count > 0) {
-            FIXME("HACK: Returning input as effect output\n");
-            HRESULT hr;
-            for (int i = 0; i < effect->input_count; i++) {
-                hr = ID2D1Image_QueryInterface(effect->inputs[i], iid, out);
-                if (hr == S_OK)
-                    break;
-            }
-            if (hr != S_OK) {
-                ERR("Effect input does not have any Images or Resources\n");
-                *out = NULL;
-                return E_NOINTERFACE;
-            }
-            return S_OK;
-        }
-    }
-
-    // If IID_ID2D1Bitmap is queried, return first input as Bitmap. Very dirty hack. 
-    // d2d_effect structure should hold rendered bitmap and return it here?
-    if (IsEqualGUID(iid, &IID_ID2D1Bitmap1)
-            || IsEqualGUID(iid, &IID_ID2D1Bitmap))
-    {
-        if (effect->input_count > 0) {
-            FIXME("HACK: Returning input as effect output\n");
-            HRESULT hr;
-            for (int i = 0; i < effect->input_count; i++) {
-                hr = ID2D1Image_QueryInterface(effect->inputs[i], iid, out);
-                if (hr == S_OK)
-                    break;
-            }
-            if (hr != S_OK) {
-                ERR("Effect input does not have any Bitmaps\n");
-                *out = NULL;
-                return E_NOINTERFACE;
-            }
-            return S_OK;
-        }
+        ID2D1Image_AddRef(&effect->ID2D1Image_iface);
+        *out = &effect->ID2D1Image_iface;
     }
 
     WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));

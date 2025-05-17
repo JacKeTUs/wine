@@ -2620,6 +2620,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     ID2D1Bitmap *bitmap;
+    ID2D1Effect *effect;
 
     TRACE("iface %p, image %p, target_offset %s, image_rect %s, interpolation_mode %#x, composite_mode %#x.\n",
             iface, image, debug_d2d_point_2f(target_offset), debug_d2d_rect_f(image_rect),
@@ -2635,6 +2636,24 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
     if (composite_mode != D2D1_COMPOSITE_MODE_SOURCE_OVER)
         FIXME("Unhandled composite mode %#x.\n", composite_mode);
 
+    if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Effect, (void **)&effect)))
+    {
+        FIXME("HACK: ID2D1Effect %p passed as parameter to DrawImage. For now draw just first input.\n", effect);
+        TRACE("Effect count: %d\n", ID2D1Effect_GetInputCount(effect));
+        ID2D1Image *effect_image;
+        ID2D1Effect_GetInput(effect, 0, &effect_image);
+
+        if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
+        {
+            d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
+
+            ID2D1Bitmap_Release(bitmap);
+        } else {
+            ERR("Effect input image is not a bitmap, can't draw\n");
+        }
+        ID2D1Image_Release(effect_image);
+        return;
+    }
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Bitmap, (void **)&bitmap)))
     {
