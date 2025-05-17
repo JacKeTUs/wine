@@ -3281,34 +3281,29 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
     //    top_layer.params.maskAntialiasMode);
     
+    ID2D1Geometry* geometry;
+
     if (top_layer.params.geometricMask) {
-        ID2D1Geometry* geometry;
         D2D1_MATRIX_3X2_F maskTransform = top_layer.params.maskTransform;
-
         TRACE("maskTransform: %s\n", debug_d2d_matrix3x2_f(&maskTransform));
-        
         d2d_matrix_multiply(&maskTransform, &top_layer.prev_transform);
-
         hr = ID2D1Factory_CreateTransformedGeometry(context->factory,
             top_layer.params.geometricMask,
             &maskTransform,
             (ID2D1TransformedGeometry**)&geometry
         );
-
         d2d_device_context_FillGeometry(iface, 
             geometry,
             &imageBrush->ID2D1Brush_iface, 
             NULL // top_layer.params.opacityBrush
         );
-        ID2D1Geometry_Release(geometry);
-
     } else {
         TRACE("Rectangle: %s\n", debug_d2d_rect_f(&size_rect));
         TRACE("Draw whole bitmap for now...\n");
-        /*hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
+        hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
             &size_rect,
             (ID2D1RectangleGeometry**)&geometry);
-        */
+        
         d2d_device_context_DrawBitmap(iface,
                 (ID2D1Bitmap*)top_layer.offscreen_bitmap,
                 NULL, 
@@ -3317,6 +3312,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
                 NULL
             );
     }
+    ID2D1Geometry_Release(geometry);
     if (hr != S_OK) {
         ERR("CreateGeometry failed\n");
         return;
