@@ -6133,6 +6133,7 @@ static HRESULT WINAPI glyphrunanalysis_GetAlphaTextureBounds(IDWriteGlyphRunAnal
 
     if (type != analysis->texture_type)
     {
+        WARN("Bounds is empty! %#x != %#x\n", type, analysis->texture_type);
         SetRectEmpty(bounds);
         return S_OK;
     }

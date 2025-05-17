@@ -1511,7 +1511,7 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
         ERR("Failed to create opacity bitmap, hr %#lx.\n", hr);
         goto done;
     }
-
+// text outline
     d2d_rect_set(&run_rect, bounds.left / scale_x, bounds.top / scale_y,
             bounds.right / scale_x, bounds.bottom / scale_y);
 
@@ -1523,6 +1523,8 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
     d2d_device_context_DrawRectangle(&context->ID2D1DeviceContext6_iface,
                                     &run_rect,(ID2D1Brush*)brbr,2,NULL);
     ID2D1Brush_Release((ID2D1Brush*)brbr);
+// text outline
+
 
     brush_desc.opacity = 1.0f;
     brush_desc.transform._11 = 1.0f;
@@ -1687,9 +1689,11 @@ static void STDMETHODCALLTYPE d2d_device_context_GetTransform(ID2D1DeviceContext
 {
     struct d2d_device_context *render_target = impl_from_ID2D1DeviceContext(iface);
 
-    TRACE("iface %p, transform %p matrix %s.\n", iface, transform, debug_d2d_matrix3x2_f(transform));
+    TRACE("iface %p, transform %p \n", iface, transform, debug_d2d_matrix3x2_f(transform));
 
     *transform = render_target->drawing_state.transform;
+
+   TRACE("current transform matrix %s\n", debug_d2d_matrix3x2_f(transform));
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_SetAntialiasMode(ID2D1DeviceContext6 *iface,
@@ -2648,11 +2652,12 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
             d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
 
             ID2D1Bitmap_Release(bitmap);
+            ID2D1Image_Release(effect_image);
+            return;
         } else {
             ERR("Effect input image is not a bitmap, can't draw\n");
+            ID2D1Image_Release(effect_image);
         }
-        ID2D1Image_Release(effect_image);
-        return;
     }
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Bitmap, (void **)&bitmap)))
@@ -3191,7 +3196,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     // Copy from draw_bitmap
     D2D1_SIZE_F _size;
     D2D1_RECT_F s, d;
-    _size = ID2D1Bitmap_GetSize(top_layer.offscreen_bitmap);
+    _size = ID2D1Bitmap1_GetSize(top_layer.offscreen_bitmap);
     d2d_rect_set(&s, 0.0f, 0.0f, _size.width, _size.height);
 
     d.left = 0.0f;
@@ -3214,7 +3219,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     if (FAILED(hr = d2d_bitmap_brush_create(
             context->factory, 
-            top_layer.offscreen_bitmap,
+            (ID2D1Bitmap*)top_layer.offscreen_bitmap,
             &bitmap_brush_desc,
             &brush_desc,
             &imageBrush)))
@@ -3268,7 +3273,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
             (ID2D1RectangleGeometry**)&geometry);
         */
         d2d_device_context_DrawBitmap(iface,
-                top_layer.offscreen_bitmap,
+                (ID2D1Bitmap*)top_layer.offscreen_bitmap,
                 NULL, 
                 top_layer.params.opacity,
                 D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
@@ -3290,7 +3295,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     //d2d_device_context_PopAxisAlignedClip(iface);
 
-    ID2D1BitmapBrush_Release(imageBrush);
+    ID2D1Brush_Release(&imageBrush->ID2D1Brush_iface);
     ID2D1Image_Release(top_layer.prev_target);
     ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
