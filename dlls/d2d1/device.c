@@ -1674,7 +1674,7 @@ static void STDMETHODCALLTYPE d2d_device_context_SetTransform(ID2D1DeviceContext
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    TRACE("iface %p, transform %p.\n", iface, transform);
+    TRACE("iface %p, transform %p matrix %s.\n", iface, transform, debug_d2d_matrix3x2_f(transform));
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_set_transform(context->target.command_list, transform);
@@ -1687,7 +1687,7 @@ static void STDMETHODCALLTYPE d2d_device_context_GetTransform(ID2D1DeviceContext
 {
     struct d2d_device_context *render_target = impl_from_ID2D1DeviceContext(iface);
 
-    TRACE("iface %p, transform %p.\n", iface, transform);
+    TRACE("iface %p, transform %p matrix %s.\n", iface, transform, debug_d2d_matrix3x2_f(transform));
 
     *transform = render_target->drawing_state.transform;
 }
@@ -3129,9 +3129,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
 
-    if (new_layer->params.layerOptions & D2D1_LAYER_OPTIONS_INITIALIZE_FOR_CLEARTYPE)
+    if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
-        TRACE("Initializing just for Cleartype\n");
+        TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
         D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
         d2d_device_context_Clear(iface, &transparentBlack);
     }
@@ -3183,7 +3183,6 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     TRACE("cur transform %s\n", debug_d2d_matrix3x2_f(&current_transform));
     TRACE("prev_transform  %s\n", debug_d2d_matrix3x2_f(&top_layer.prev_transform));
 
-
     TRACE("SetTarget successfull\n");
 
     ID2D1BitmapBrush* imageBrush;
@@ -3223,7 +3222,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
         top_layer.params.maskAntialiasMode);
-    
+
     ID2D1Geometry* geometry;
     if (top_layer.params.geometricMask) {
         hr = ID2D1Factory_CreateTransformedGeometry(context->factory,
@@ -3234,7 +3233,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     } else {
         TRACE("Rectangle: %s\n", debug_d2d_rect_f(&destination_bounds));
         hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
-            &destination_bounds,
+            &size,
             (ID2D1RectangleGeometry**)&geometry);
     }
     if (hr != S_OK) {
