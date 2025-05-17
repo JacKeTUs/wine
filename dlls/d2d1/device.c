@@ -3161,6 +3161,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     d2d_device_context_GetTransform(iface, &current_transform);
     d2d_device_context_SetTransform(iface, &identity);
     
+    TRACE("cur transform %s\n", debug_d2d_matrix3x2_f(&current_transform));
+    TRACE("prev_transform  %s\n", debug_d2d_matrix3x2_f(&top_layer.prev_transform));
+
+
     TRACE("SetTarget successfull\n");
 
     ID2D1BitmapBrush* imageBrush;

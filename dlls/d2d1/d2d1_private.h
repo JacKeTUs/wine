@@ -423,13 +423,14 @@ struct d2d_layer
     ID2D1Bitmap1 *offscreen_bitmap;
 
     D2D1_MATRIX_3X2_F prev_transform;
+
     D2D1_SIZE_F size;
 };
 
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
+
 static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface, 
         const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer);
-
 
 struct d2d_mesh
 {
@@ -1072,7 +1073,6 @@ static inline const char *debug_d2d_ellipse(const D2D1_ELLIPSE *ellipse)
     return wine_dbg_sprintf("(%.8e, %.8e)[%.8e, %.8e]",
             ellipse->point.x, ellipse->point.y, ellipse->radiusX, ellipse->radiusY);
 }
-
 
 static inline const char *debug_d2d_matrix3x2_f(const D2D1_MATRIX_3X2_F *matrix)
 {
