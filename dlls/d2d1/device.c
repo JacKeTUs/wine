@@ -1517,6 +1517,7 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
 
     D2D1_COLOR_F c = {1,0,0,1};
     ID2D1SolidColorBrush *brbr;
+    
     d2d_device_context_CreateSolidColorBrush(&context->ID2D1DeviceContext6_iface,
                                     &c, NULL, &brbr);
     d2d_device_context_DrawRectangle(&context->ID2D1DeviceContext6_iface,
@@ -3158,7 +3159,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
     d2d_device_context_GetTransform(iface, &current_transform);
-    d2d_device_context_SetTransform(iface, &top_layer.prev_transform);
+    d2d_device_context_SetTransform(iface, &identity);
     
     TRACE("SetTarget successfull\n");
 
