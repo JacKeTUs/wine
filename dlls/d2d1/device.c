@@ -1811,8 +1811,14 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
     memcpy(&parameters, layer_parameters, sizeof(*layer_parameters));
     parameters.layerOptions = D2D1_LAYER_OPTIONS1_NONE;
 
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    if (context->target.type == D2D_TARGET_UNKNOWN) {
+        ERR("Unknown target?\n");
+        return;
+    }
+    if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_push_layer(context->target.command_list, context, &parameters, layer);
+        return;
+    }
 
     d2d_device_context_push_layer_impl(iface, &parameters, layer);
 }
@@ -1888,8 +1894,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PushAxisAlignedClip(ID2D1Device
 
     TRACE("iface %p, clip_rect %s, antialias_mode %#x.\n", iface, debug_d2d_rect_f(clip_rect), antialias_mode);
 
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_push_clip(context->target.command_list, clip_rect, antialias_mode);
+        return;
+    }
 
     if (antialias_mode != D2D1_ANTIALIAS_MODE_ALIASED)
         FIXME("Ignoring antialias_mode %#x.\n", antialias_mode);
@@ -1919,8 +1927,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PopAxisAlignedClip(ID2D1DeviceC
 
     TRACE("iface %p.\n", iface);
 
-    if (context->target.type == D2D_TARGET_COMMAND_LIST)
+    if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_pop_clip(context->target.command_list);
+        return;
+    }
 
     d2d_clip_stack_pop(&context->clip_stack);
 }
@@ -3112,9 +3122,28 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     
     props.dpiX = dpiX;
     props.dpiY = dpiY;
-    props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+
+    ID2D1Bitmap* current_bitmap_target;
+    if (SUCCEEDED(ID2D1Image_QueryInterface(new_layer->prev_target, &IID_ID2D1Bitmap, (void **)&current_bitmap_target)))
+    {
+        TRACE("Current target is bitmap! Copying pixelFormat from there\n");
+        struct d2d_bitmap *bitmap_impl;
+
+        bitmap_impl = unsafe_impl_from_ID2D1Bitmap(current_bitmap_target);
+        props.pixelFormat = bitmap_impl->format;
+
+        ID2D1Bitmap_Release(current_bitmap_target);
+    } else {
+        TRACE("Current target is something else... Setting 'default'"\n);
+        props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+    }
+
+    TRACE("offscreen bitmap pixelFormat: f %#x a %#x\n", props.pixelFormat.format, props.pixelFormat.alphaMode);
+
+    // Setting our offscreen bitmap as target
     props.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
+    TRACE("bo %#x a %#x\n", props.bitmapOptions);
 
     hr = d2d_device_context_ID2D1DeviceContext_CreateBitmap(iface,
         new_layer->pixel_size,
@@ -3132,9 +3161,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
     if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
-        TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
-        D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
-        d2d_device_context_Clear(iface, &transparentBlack);
+        //TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
+        //D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
+        //d2d_device_context_Clear(iface, &transparentBlack);
     }
 
     if (!d2d_layer_stack_push(&context->layer_stack, new_layer)) {
@@ -3150,6 +3179,10 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 
     FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
+    if (context->target.type == D2D_TARGET_UNKNOWN) {
+        ERR("Unknown target?\n");
+        return;
+    }
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
     {
         d2d_command_list_push_layer(context->target.command_list, context, layer_parameters, layer);
@@ -3165,6 +3198,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     HRESULT hr = S_OK;
     FIXME("WIP iface %p stub!\n", iface);
 
+    if (context->target.type == D2D_TARGET_UNKNOWN) {
+        ERR("Unknown target?\n");
+        return;
+    }
     if (context->target.type == D2D_TARGET_COMMAND_LIST) {
         d2d_command_list_pop_layer(context->target.command_list);
         return;
@@ -3261,7 +3298,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         d2d_device_context_FillGeometry(iface, 
             geometry,
             &imageBrush->ID2D1Brush_iface, 
-            top_layer.params.opacityBrush
+            NULL // top_layer.params.opacityBrush
         );
         ID2D1Geometry_Release(geometry);
 
