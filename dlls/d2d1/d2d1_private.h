@@ -1073,4 +1073,14 @@ static inline const char *debug_d2d_ellipse(const D2D1_ELLIPSE *ellipse)
             ellipse->point.x, ellipse->point.y, ellipse->radiusX, ellipse->radiusY);
 }
 
+
+static inline const char *debug_d2d_matrix3x2_f(const D2D1_MATRIX_3X2_F *matrix)
+{
+    if (!matrix)
+        return "(null)";
+    return wine_dbg_sprintf("(%.4e, %.4e)-(%.4e, %.4e)-(%.4e, %.4e)", matrix->_11, matrix->_12, 
+                                                                    matrix->_21, matrix->_22,
+                                                                    matrix->_31, matrix->_32);
+}
+
 #endif /* __WINE_D2D1_PRIVATE_H */
