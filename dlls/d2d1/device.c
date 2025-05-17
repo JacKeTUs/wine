@@ -3108,7 +3108,6 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     }
 
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
-    d2d_device_context_SetTransform(iface, &identity);
 
     if (new_layer->params.layerOptions & D2D1_LAYER_OPTIONS_INITIALIZE_FOR_CLEARTYPE)
     {
