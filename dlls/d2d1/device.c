@@ -3236,8 +3236,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     TRACE("size of offscreen bitmap: %f, %f\n", size.width, size.height);
     TRACE("destination: %s\n", debug_d2d_rect_f(&destination_bounds));
 
-    d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
-        top_layer.params.maskAntialiasMode);
+    //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
+    //    top_layer.params.maskAntialiasMode);
     
     if (top_layer.params.geometricMask) {
         ID2D1Geometry* geometry;
@@ -3288,7 +3288,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     TRACE("Cleaning\n");
 
-    d2d_device_context_PopAxisAlignedClip(iface);
+    //d2d_device_context_PopAxisAlignedClip(iface);
 
     ID2D1BitmapBrush_Release(imageBrush);
     ID2D1Image_Release(top_layer.prev_target);
