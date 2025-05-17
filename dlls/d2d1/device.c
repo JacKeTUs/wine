@@ -3134,7 +3134,7 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
         ID2D1Bitmap_Release(current_bitmap_target);
     } else {
-        TRACE("Current target is something else... Setting 'default'"\n);
+        TRACE("Current target is something else... Setting default pixelFormat\n");
         props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
         props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
     }
