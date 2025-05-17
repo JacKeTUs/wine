@@ -3211,8 +3211,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     // Apply clip geometry and draw
     D2D1_SIZE_F size;
+    D2D1_RECT_F size_rect;
     D2D1_RECT_F destination_bounds;
     size = ID2D1Bitmap1_GetSize(top_layer.offscreen_bitmap);
+    d2d_rect_set(&size_rect, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_set(&destination_bounds, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_intersect(&destination_bounds, &top_layer.params.contentBounds);
 
@@ -3231,9 +3233,9 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
             (ID2D1TransformedGeometry**)&geometry
         );
     } else {
-        TRACE("Rectangle: %s\n", debug_d2d_rect_f(&destination_bounds));
+        TRACE("Rectangle: %s\n", debug_d2d_rect_f(&size_rect));
         hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
-            &size,
+            &size_rect,
             (ID2D1RectangleGeometry**)&geometry);
     }
     if (hr != S_OK) {
