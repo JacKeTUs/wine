@@ -2939,26 +2939,10 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         // Not so efficient, because we always clip from InfiniteMatrix and transform our rect from identity.
         D2D1_RECT_F dst = batch->sprites[i].destinationRect;
 
-        D2D1_RECT_F transformed_rect;
-        float x_scale, y_scale;
-        D2D1_POINT_2F point;
 
-        // Copied from somewhere here
-        x_scale = context->desc.dpiX / 96.0f;
-        y_scale = context->desc.dpiY / 96.0f;
-        d2d_point_transform(&point, &batch->sprites[i].transform,
-                dst.left * x_scale, dst.top * y_scale);
-        d2d_rect_set(&transformed_rect, point.x, point.y, point.x, point.y);
-        d2d_point_transform(&point, &batch->sprites[i].transform,
-                dst.left * x_scale, dst.bottom * y_scale);
-        d2d_rect_expand(&transformed_rect, &point);
-        d2d_point_transform(&point, &batch->sprites[i].transform,
-                dst.right * x_scale, dst.top * y_scale);
-        d2d_rect_expand(&transformed_rect, &point);
-        d2d_point_transform(&point, &batch->sprites[i].transform,
-                dst.right * x_scale, dst.bottom * y_scale);
-        d2d_rect_expand(&transformed_rect, &point);
-
+        D2D1_MATRIX_3X2_F prev_tr;
+        d2d_device_context_GetTransform(iface,&prev_tr);
+        d2d_device_context_SetTransform(iface, &batch->sprites[i].transform);
 
         D2D1_RECT_F src_rect_f;
         src_rect_f.left   = (FLOAT)batch->sprites[i].sourceRect.left;
@@ -2968,8 +2952,10 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
         context->target.bitmap->is_tinted = TRUE;
         context->target.bitmap->tint_colour = batch->sprites[i].color;
-        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, 1, interpolation_mode, &src_rect_f);
+        d2d_device_context_DrawBitmap(iface, bitmap, &dst, 1, interpolation_mode, &src_rect_f);
         context->target.bitmap->is_tinted = FALSE;
+
+        d2d_device_context_SetTransform(iface, &prev_tr);
     }
 
     d2d_device_context_SetAntialiasMode(iface, old_mode);
