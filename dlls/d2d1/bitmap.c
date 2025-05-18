@@ -427,6 +427,11 @@ static void d2d_bitmap_init(struct d2d_bitmap *bitmap, struct d2d_device_context
     {
         WARN("Failed to initialize clip stack.\n");
     }
+    bitmap->is_tinted = FALSE;
+    bitmap->tint_colour.r=1;
+    bitmap->tint_colour.g=1;
+    bitmap->tint_colour.b=1;
+    bitmap->tint_colour.a=1;
 }
 
 static BOOL check_bitmap_options(unsigned int options)

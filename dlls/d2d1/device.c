@@ -790,6 +790,7 @@ static void STDMETHODCALLTYPE d2d_device_context_FillEllipse(ID2D1DeviceContext6
     ID2D1EllipseGeometry_Release(geometry);
 }
 
+
 static HRESULT d2d_device_context_update_ps_cb(struct d2d_device_context *context,
         struct d2d_brush *brush, struct d2d_brush *opacity_brush, BOOL outline, BOOL is_arc)
 {
@@ -811,12 +812,13 @@ static HRESULT d2d_device_context_update_ps_cb(struct d2d_device_context *contex
     cb_data = map_desc.pData;
     cb_data->outline = outline;
     cb_data->is_arc = is_arc;
-    cb_data->pad[0] = 0;
-    cb_data->pad[1] = 0;
+    cb_data->is_tinted = context->target.bitmap->is_tinted;
+    cb_data->pad = 0;
     if (!d2d_brush_fill_cb(brush, &cb_data->colour_brush))
         WARN("Failed to initialize colour brush buffer.\n");
     if (!d2d_brush_fill_cb(opacity_brush, &cb_data->opacity_brush))
         WARN("Failed to initialize opacity brush buffer.\n");
+    cb_data->tint_colour = context->target.bitmap->tint_colour;
 
     ID3D11DeviceContext_Unmap(d3d_context, (ID3D11Resource *)context->ps_cb, 0);
     ID3D11DeviceContext_Release(d3d_context);
@@ -2953,7 +2955,10 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         src_rect_f.right  = (FLOAT)batch->sprites[i].sourceRect.right;
         src_rect_f.bottom = (FLOAT)batch->sprites[i].sourceRect.bottom;
 
-        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, batch->sprites[i].color.a, interpolation_mode, &src_rect_f);
+        context->target.bitmap->is_tinted = TRUE;
+        context->target.bitmap->tint_colour = batch->sprites[i].color;
+        d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, 1, interpolation_mode, &src_rect_f);
+        context->target.bitmap->is_tinted = FALSE;
     }
 
     d2d_device_context_SetAntialiasMode(iface, old_mode);
@@ -4161,12 +4166,14 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         "\n"
         "bool outline;\n"
         "bool is_arc;\n"
+        "bool is_tinted;\n"
         "struct brush\n"
         "{\n"
         "    uint type;\n"
         "    float opacity;\n"
         "    float4 data[3];\n"
         "} colour_brush, opacity_brush;\n"
+        "float4 tint_colour;\n"
         "\n"
         "SamplerState s0, s1;\n"
         "Texture2D t0, t1;\n"
@@ -4297,6 +4304,8 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         "    colour = sample_brush(colour_brush, t0, s0, b0, i.p);\n"
         "    if (opacity_brush.type < BRUSH_TYPE_COUNT)\n"
         "        colour *= sample_brush(opacity_brush, t1, s1, b1, i.p).a;\n"
+        "    if (is_tinted)\n"
+        "        colour *= tint_colour;\n"
         "\n"
         "    if (outline)\n"
         "    {\n"
