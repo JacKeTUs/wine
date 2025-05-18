@@ -3176,9 +3176,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 
     if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
-        //TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
-        //D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
-        //d2d_device_context_Clear(iface, &transparentBlack);
+        TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
+        D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
+        d2d_device_context_Clear(iface, &transparentBlack);
     }
 
     if (!d2d_layer_stack_push(&context->layer_stack, &new_layer)) {
@@ -3311,42 +3311,34 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
             &maskTransform,
             (ID2D1TransformedGeometry**)&geometry
         );
-        d2d_device_context_FillGeometry(iface, 
-            geometry,
-            &imageBrush->ID2D1Brush_iface, 
-            NULL // top_layer.params.opacityBrush
-        );
+
     } else {
         TRACE("Rectangle: %s\n", debug_d2d_rect_f(&size_rect));
         TRACE("Draw whole bitmap for now...\n");
         hr = ID2D1Factory_CreateRectangleGeometry(context->factory,
             &size_rect,
             (ID2D1RectangleGeometry**)&geometry);
-        
-        d2d_device_context_DrawBitmap(iface,
-                (ID2D1Bitmap*)top_layer->offscreen_bitmap,
-                NULL, 
-                top_layer->params.opacity,
-                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                NULL
-            );
     }
-    if (geometry) ID2D1Geometry_Release(geometry);
-
-    ID2D1Brush_Release(&imageBrush->ID2D1Brush_iface);
 
     if (hr != S_OK) {
         ERR("CreateGeometry failed\n");
         return;
-    } else {
-        TRACE("CreateGeometry successfull\n");
     }
 
-    TRACE("d2d_device_context_FillGeometry successfull\n");    
-
-    d2d_device_context_SetTransform(iface, &current_transform);
+    d2d_device_context_FillGeometry(iface, 
+            geometry,
+            &imageBrush->ID2D1Brush_iface, 
+            NULL //top_layer->params.opacityBrush
+        );
+    ID2D1Geometry_Release(geometry);
+    
+    ID2D1Brush_Release(&imageBrush->ID2D1Brush_iface);
 
     //d2d_device_context_PopAxisAlignedClip(iface);
+    
+    d2d_device_context_SetTransform(iface, &current_transform);
+
+    
     ID2D1Layer_Release(&top_layer->ID2D1Layer_iface);
 }
 
