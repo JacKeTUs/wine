@@ -2657,7 +2657,16 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
             if (effect_image) {
                 if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
                 {
+                    struct d2d_effect* effect_context = unsafe_impl_from_ID2D1Effect(effect);
+                    if (effect_context && IsEqualCLSID(&effect_context->effect_id, &CLSID_D2D1Tint)) {
+                        TRACE("Tint effect! Lets draw it with tint\n");
+                        //ID2D1Effect_GetValue(effect, 0, D2D1_PROPERTY_TYPE_VECTOR4, (BYTE*)&context->target.bitmap->tint_colour, sizeof(D2D1_COLOR_F));
+                        //context->target.bitmap->is_tinted = TRUE;
+                    }
                     d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
+                    if (effect_context && IsEqualCLSID(&effect_context->effect_id, &CLSID_D2D1Tint)) {
+                        //context->target.bitmap->is_tinted = FALSE;
+                    }
 
                     ID2D1Bitmap_Release(bitmap);
                 } else {
@@ -2952,7 +2961,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
         context->target.bitmap->is_tinted = TRUE;
         context->target.bitmap->tint_colour = batch->sprites[i].color;
-        d2d_device_context_DrawBitmap(iface, bitmap, &dst, 1, interpolation_mode, &src_rect_f);
+        d2d_device_context_DrawBitmap(iface, bitmap, &dst, context->target.bitmap->tint_colour.a, interpolation_mode, &src_rect_f);
         context->target.bitmap->is_tinted = FALSE;
 
         d2d_device_context_SetTransform(iface, &prev_tr);
@@ -4289,10 +4298,10 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         "    float4 colour;\n"
         "\n"
         "    colour = sample_brush(colour_brush, t0, s0, b0, i.p);\n"
-        "    if (opacity_brush.type < BRUSH_TYPE_COUNT)\n"
-        "        colour *= sample_brush(opacity_brush, t1, s1, b1, i.p).a;\n"
         "    if (is_tinted)\n"
         "        colour *= tint_colour;\n"
+        "    if (opacity_brush.type < BRUSH_TYPE_COUNT)\n"
+        "        colour *= sample_brush(opacity_brush, t1, s1, b1, i.p).a;\n"
         "\n"
         "    if (outline)\n"
         "    {\n"

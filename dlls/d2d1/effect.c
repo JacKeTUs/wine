@@ -2744,7 +2744,16 @@ HRESULT d2d_effect_create(struct d2d_device_context *context, const CLSID *effec
 
     *effect = &object->ID2D1Effect_iface;
 
+    object->effect_id = *effect_id;
     TRACE("Created effect %s %p.\n", wine_dbgstr_guid(effect_id), *effect);
 
     return S_OK;
+}
+
+struct d2d_effect *unsafe_impl_from_ID2D1Effect(ID2D1Effect *iface)
+{
+    if (!iface)
+        return NULL;
+    assert(iface->lpVtbl == (ID2D1EffectVtbl *)&d2d_effect_vtbl);
+    return CONTAINING_RECORD(iface, struct d2d_effect, ID2D1Effect_iface);
 }
