@@ -1788,7 +1788,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
+    TRACE("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
     D2D1_LAYER_PARAMETERS1 parameters;
     memcpy(&parameters, layer_parameters, sizeof(*layer_parameters));
@@ -2644,22 +2644,25 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Effect, (void **)&effect)))
     {
-        FIXME("HACK: ID2D1Effect %p passed as parameter to DrawImage. For now draw just first input.\n", effect);
+        TRACE("HACK: ID2D1Effect %p passed as parameter to DrawImage. For now draw just first input.\n", effect);
         TRACE("Effect count: %d\n", ID2D1Effect_GetInputCount(effect));
-        ID2D1Image *effect_image;
-        ID2D1Effect_GetInput(effect, 0, &effect_image);
+        ID2D1Image *effect_image = NULL;
+        if (ID2D1Effect_GetInputCount(effect) == 1) {
+            ID2D1Effect_GetInput(effect, 0, &effect_image);
+            if (effect_image) {
+                if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
+                {
+                    d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
 
-        if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
-        {
-            d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
-
-            ID2D1Bitmap_Release(bitmap);
-            ID2D1Image_Release(effect_image);
-            return;
-        } else {
-            ERR("Effect input image is not a bitmap, can't draw\n");
-            ID2D1Image_Release(effect_image);
+                    ID2D1Bitmap_Release(bitmap);
+                } else {
+                    ERR("Effect input image is not a bitmap, can't draw\n");
+                }
+                ID2D1Image_Release(effect_image);
+            }
         }
+        ID2D1Effect_Release(effect);
+        return;
     }
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Bitmap, (void **)&bitmap)))
@@ -2910,8 +2913,8 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     TRACE("Sprite count is %d.\n", sprite_count);
     TRACE("Sprite count in batch is %d.\n", batch->sprite_count);
 
-    if (start_index >= batch->sprite_count) {
-        WARN("Start index %d is greater than batch->sprite_count %d\n", start_index, batch->sprite_count);
+    if (start_index + sprite_count > batch->sprite_count) {
+        WARN("Start index %d + sprite_count %d is greater than batch->sprite_count %d\n", start_index, sprite_count, batch->sprite_count);
         return;
     }
 
@@ -2923,7 +2926,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
     /* Iterate over the sprites */
     for (UINT32 i = start_index; i < start_index + sprite_count; i++)
     {
-        TRACE("Drawing %u sprite from batch.\n", i);
+        TRACE("Drawing %u sprite from batch.\n", i+1);
 
         // Basically need to draw our bitmap into dst,src from batch, with opacity in color (no color mult for now) and transforming
         // For now ignore interpolation mode or other sprite options.
@@ -3123,6 +3126,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     props.dpiX = dpiX;
     props.dpiY = dpiY;
 
+    props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+
     ID2D1Bitmap* current_bitmap_target;
     if (SUCCEEDED(ID2D1Image_QueryInterface(new_layer->prev_target, &IID_ID2D1Bitmap, (void **)&current_bitmap_target)))
     {
@@ -3130,13 +3136,11 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         struct d2d_bitmap *bitmap_impl;
 
         bitmap_impl = unsafe_impl_from_ID2D1Bitmap(current_bitmap_target);
-        props.pixelFormat = bitmap_impl->format;
-
+        if (bitmap_impl)
+            props.pixelFormat = bitmap_impl->format;
         ID2D1Bitmap_Release(current_bitmap_target);
     } else {
         TRACE("Current target is something else... Setting default pixelFormat\n");
-        props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
     }
 
     TRACE("offscreen bitmap pixelFormat: f %#x a %#x\n", props.pixelFormat.format, props.pixelFormat.alphaMode);
@@ -3157,12 +3161,9 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         return;
     }
 
-    d2d_device_context_EndDraw(iface, NULL, NULL);
     D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
     TRACE("Antialiased mode now: %#x\n", old_mode);
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
-    d2d_device_context_BeginDraw(iface);
-
 
     if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
@@ -3182,7 +3183,7 @@ static void STDMETHODCALLTYPE d2d_device_context_ID2D1DeviceContext_PushLayer(ID
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    FIXME("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
+    TRACE("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
     if (context->target.type == D2D_TARGET_UNKNOWN) {
         ERR("Unknown target?\n");
@@ -3201,7 +3202,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     HRESULT hr = S_OK;
-    FIXME("WIP iface %p stub!\n", iface);
+    TRACE("iface %p\n");
 
     if (context->target.type == D2D_TARGET_UNKNOWN) {
         ERR("Unknown target?\n");
@@ -3219,11 +3220,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
     d2d_device_context_GetTransform(iface, &current_transform);
-    d2d_device_context_EndDraw(iface, NULL, NULL);
-
     d2d_device_context_SetTarget(iface, top_layer.prev_target);
 
-    d2d_device_context_BeginDraw(iface);
     d2d_device_context_SetTransform(iface, &identity);
     
     TRACE("cur transform %s\n", debug_d2d_matrix3x2_f(&current_transform));
@@ -3231,7 +3229,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     TRACE("SetTarget successfull\n");
 
-    struct d2d_brush * imageBrush;
+    struct d2d_brush *imageBrush;
 
     // Set layer opacity to brush properties
     D2D1_BRUSH_PROPERTIES brush_desc;
@@ -3289,7 +3287,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
     //    top_layer.params.maskAntialiasMode);
 
-    ID2D1Geometry* geometry;
+    ID2D1Geometry* geometry = NULL;
 
     if (top_layer.params.geometricMask) {
         D2D1_MATRIX_3X2_F maskTransform = top_layer.params.maskTransform;
@@ -3320,7 +3318,10 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
                 NULL
             );
     }
-    ID2D1Geometry_Release(geometry);
+    if (geometry) ID2D1Geometry_Release(geometry);
+
+    ID2D1Brush_Release(&imageBrush->ID2D1Brush_iface);
+
     if (hr != S_OK) {
         ERR("CreateGeometry failed\n");
         return;
@@ -3332,16 +3333,12 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     d2d_device_context_SetTransform(iface, &current_transform);
 
-    TRACE("Cleaning\n");
-
     //d2d_device_context_PopAxisAlignedClip(iface);
-
-    ID2D1Brush_Release(&imageBrush->ID2D1Brush_iface);
-    ID2D1Image_Release(top_layer.prev_target);
-    ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
+    if (top_layer.prev_target)
+        ID2D1Image_Release(top_layer.prev_target);
+    if (top_layer.offscreen_bitmap)
+        ID2D1Bitmap1_Release(top_layer.offscreen_bitmap);
     ID2D1Layer_Release(&top_layer.ID2D1Layer_iface);
-
-    TRACE("Cleaning done\n");
 }
 
 static const struct ID2D1DeviceContext6Vtbl d2d_device_context_vtbl =
