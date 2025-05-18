@@ -821,6 +821,8 @@ struct d2d_effect
     ID2D1Image *output;
     size_t inputs_size;
     size_t input_count;
+
+    CLSID effect_id;
 };
 
 HRESULT d2d_effect_create(struct d2d_device_context *context, const CLSID *effect_id,
@@ -836,6 +838,7 @@ void d2d_effect_properties_cleanup(struct d2d_effect_properties *props);
 HRESULT d2d_factory_register_builtin_effect(struct d2d_factory *factory, REFCLSID effect_id,
         const WCHAR *property_xml, const D2D1_PROPERTY_BINDING *bindings, UINT32 binding_count,
         PD2D1_EFFECT_FACTORY effect_factory);
+struct d2d_effect *unsafe_impl_from_ID2D1Effect(ID2D1Effect *iface);
 
 struct d2d_vertex_buffer
 {
