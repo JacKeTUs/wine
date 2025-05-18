@@ -65,7 +65,7 @@ extern struct d2d_settings d2d_settings;
 
 struct d2d_layer_stack
 {
-    struct d2d_layer *stack;
+    struct d2d_layer **stack; // stack of pointers to the d2d_layer
     size_t size;
     size_t count;
 };
@@ -430,9 +430,8 @@ struct d2d_layer
 };
 
 HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct d2d_layer **layer);
+struct d2d_layer *unsafe_impl_from_ID2D1Layer(ID2D1Layer *iface);
 
-static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface, 
-        const D2D1_LAYER_PARAMETERS1 *layer_parameters, ID2D1Layer *layer);
 
 struct d2d_mesh
 {
