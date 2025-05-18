@@ -22,7 +22,6 @@
 WINE_DEFAULT_DEBUG_CHANNEL(d2d);
 
 #define INITIAL_LAYER_STACK_SIZE 4
-#define INITIAL_CLIP_STACK_SIZE 4
 
 static const D2D1_MATRIX_3X2_F identity =
 {{{
@@ -79,21 +78,6 @@ static void d2d_size_set(D2D1_SIZE_U *dst, float width, float height)
     dst->height = height;
 }
 
-static BOOL d2d_clip_stack_init(struct d2d_clip_stack *stack)
-{
-    if (!(stack->stack = malloc(INITIAL_CLIP_STACK_SIZE * sizeof(*stack->stack))))
-        return FALSE;
-
-    stack->size = INITIAL_CLIP_STACK_SIZE;
-    stack->count = 0;
-
-    return TRUE;
-}
-
-static void d2d_clip_stack_cleanup(struct d2d_clip_stack *stack)
-{
-    free(stack->stack);
-}
 
 static BOOL d2d_clip_stack_push(struct d2d_clip_stack *stack, const D2D1_RECT_F *rect)
 {
@@ -116,8 +100,6 @@ static void d2d_clip_stack_pop(struct d2d_clip_stack *stack)
         return;
     --stack->count;
 }
-
-
 
 static BOOL d2d_layer_stack_init(struct d2d_layer_stack *stack)
 {
@@ -161,6 +143,14 @@ static BOOL d2d_layer_stack_pop(struct d2d_layer_stack *stack, struct d2d_layer 
     return TRUE;
 }
 
+static struct d2d_clip_stack* d2d_return_target_clip_stack(struct d2d_device_context *context) {
+    if (context->target.type != D2D_TARGET_BITMAP) {
+        ERR("Clip Stack is only on BITMAP target\n");
+        return NULL;
+    }
+    return &context->target.bitmap->clip_stack;
+}
+
 static void d2d_device_context_draw(struct d2d_device_context *render_target, enum d2d_shape_type shape_type,
         ID3D11Buffer *ib, unsigned int index_count, ID3D11Buffer *vb, unsigned int vb_stride,
         struct d2d_brush *brush, struct d2d_brush *opacity_brush)
@@ -197,12 +187,15 @@ static void d2d_device_context_draw(struct d2d_device_context *render_target, en
     ID3D11DeviceContext1_PSSetConstantBuffers(context, 0, 1, &ps_cb);
     ID3D11DeviceContext1_PSSetShader(context, render_target->ps, NULL, 0);
     ID3D11DeviceContext1_RSSetViewports(context, 1, &vp);
-    if (render_target->clip_stack.count)
+
+    struct d2d_clip_stack* clip_stack;
+    clip_stack = d2d_return_target_clip_stack(render_target);
+    if (clip_stack && clip_stack->count)
     {
         TRACE("Draw - active clip!\n");
         const D2D1_RECT_F *clip_rect;
 
-        clip_rect = &render_target->clip_stack.stack[render_target->clip_stack.count - 1];
+        clip_rect = &clip_stack->stack[clip_stack->count - 1];
         scissor_rect.left = ceilf(clip_rect->left - 0.5f);
         scissor_rect.top = ceilf(clip_rect->top - 0.5f);
         scissor_rect.right = ceilf(clip_rect->right - 0.5f);
@@ -320,7 +313,6 @@ static ULONG STDMETHODCALLTYPE d2d_device_context_inner_Release(IUnknown *iface)
     {
         unsigned int i, j, k;
 
-        d2d_clip_stack_cleanup(&context->clip_stack);
         d2d_layer_stack_cleanup(&context->layer_stack);
         IDWriteRenderingParams_Release(context->default_text_rendering_params);
         if (context->text_rendering_params)
@@ -1511,20 +1503,6 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
         ERR("Failed to create opacity bitmap, hr %#lx.\n", hr);
         goto done;
     }
-// text outline
-    d2d_rect_set(&run_rect, bounds.left / scale_x, bounds.top / scale_y,
-            bounds.right / scale_x, bounds.bottom / scale_y);
-
-    D2D1_COLOR_F c = {1,0,0,1};
-    ID2D1SolidColorBrush *brbr;
-    
-    d2d_device_context_CreateSolidColorBrush(&context->ID2D1DeviceContext6_iface,
-                                    &c, NULL, &brbr);
-    d2d_device_context_DrawRectangle(&context->ID2D1DeviceContext6_iface,
-                                    &run_rect,(ID2D1Brush*)brbr,2,NULL);
-    ID2D1Brush_Release((ID2D1Brush*)brbr);
-// text outline
-
 
     brush_desc.opacity = 1.0f;
     brush_desc.transform._11 = 1.0f;
@@ -1689,7 +1667,7 @@ static void STDMETHODCALLTYPE d2d_device_context_GetTransform(ID2D1DeviceContext
 {
     struct d2d_device_context *render_target = impl_from_ID2D1DeviceContext(iface);
 
-    TRACE("iface %p, transform %p \n", iface, transform, debug_d2d_matrix3x2_f(transform));
+    TRACE("iface %p, transform %p\n", iface, transform);
 
     *transform = render_target->drawing_state.transform;
 
@@ -1899,6 +1877,11 @@ static void STDMETHODCALLTYPE d2d_device_context_PushAxisAlignedClip(ID2D1Device
         return;
     }
 
+    if (context->target.type != D2D_TARGET_BITMAP) {
+        ERR("PushAxisAlignedClip supports only BITMAP target\n");
+        return;
+    }
+
     if (antialias_mode != D2D1_ANTIALIAS_MODE_ALIASED)
         FIXME("Ignoring antialias_mode %#x.\n", antialias_mode);
 
@@ -1917,7 +1900,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PushAxisAlignedClip(ID2D1Device
             clip_rect->right * x_scale, clip_rect->bottom * y_scale);
     d2d_rect_expand(&transformed_rect, &point);
 
-    if (!d2d_clip_stack_push(&context->clip_stack, &transformed_rect))
+    if (!d2d_clip_stack_push(d2d_return_target_clip_stack(context), &transformed_rect))
         WARN("Failed to push clip rect.\n");
 }
 
@@ -1931,8 +1914,12 @@ static void STDMETHODCALLTYPE d2d_device_context_PopAxisAlignedClip(ID2D1DeviceC
         d2d_command_list_pop_clip(context->target.command_list);
         return;
     }
+    if (context->target.type != D2D_TARGET_BITMAP) {
+        ERR("PopAxisAlignedClip supports only BITMAP target\n");
+        return;
+    }
 
-    d2d_clip_stack_pop(&context->clip_stack);
+    d2d_clip_stack_pop(d2d_return_target_clip_stack(context));
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_Clear(ID2D1DeviceContext6 *iface, const D2D1_COLOR_F *colour)
@@ -2925,6 +2912,9 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
     TRACE("Drawing %u sprites from batch.\n", sprite_count);
 
+    D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
+    TRACE("Antialiased mode now: %#x\n", old_mode);
+    d2d_device_context_SetAntialiasMode(iface, D2D1_ANTIALIAS_MODE_ALIASED);
     /* Iterate over the sprites */
     for (UINT32 i = start_index; i < start_index + sprite_count; i++)
     {
@@ -2965,6 +2955,8 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
         d2d_device_context_DrawBitmap(iface, bitmap, &transformed_rect, batch->sprites[i].color.a, interpolation_mode, &src_rect_f);
     }
+
+    d2d_device_context_SetAntialiasMode(iface, old_mode);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSvgGlyphStyle(ID2D1DeviceContext6 *iface,
@@ -3157,7 +3149,12 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         return;
     }
 
+    d2d_device_context_EndDraw(iface, NULL, NULL);
+    D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
+    TRACE("Antialiased mode now: %#x\n", old_mode);
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
+    d2d_device_context_BeginDraw(iface);
+
 
     if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
@@ -3212,10 +3209,13 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     TRACE("stack size now is %I64d\n", context->layer_stack.count);
 
-    d2d_device_context_SetTarget(iface, top_layer.prev_target);
-
     D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
     d2d_device_context_GetTransform(iface, &current_transform);
+    d2d_device_context_EndDraw(iface, NULL, NULL);
+
+    d2d_device_context_SetTarget(iface, top_layer.prev_target);
+
+    d2d_device_context_BeginDraw(iface);
     d2d_device_context_SetTransform(iface, &identity);
     
     TRACE("cur transform %s\n", debug_d2d_matrix3x2_f(&current_transform));
@@ -3280,7 +3280,7 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
     //    top_layer.params.maskAntialiasMode);
-    
+
     ID2D1Geometry* geometry;
 
     if (top_layer.params.geometricMask) {
@@ -4560,12 +4560,6 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
 
     render_target->drawing_state.transform = identity;
 
-    if (!d2d_clip_stack_init(&render_target->clip_stack))
-    {
-        WARN("Failed to initialize clip stack.\n");
-        hr = E_FAIL;
-        goto err;
-    }
     if (!d2d_layer_stack_init(&render_target->layer_stack))
     {
         WARN("Failed to initialize layer stack.\n");

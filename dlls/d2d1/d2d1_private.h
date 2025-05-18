@@ -56,6 +56,7 @@ enum d2d_shape_type
     D2D_SHAPE_TYPE_COUNT,
 };
 
+
 struct d2d_settings
 {
     unsigned int max_version_factory;
@@ -226,7 +227,6 @@ struct d2d_device_context
 
     D2D1_RENDER_TARGET_PROPERTIES desc;
     D2D1_SIZE_U pixel_size;
-    struct d2d_clip_stack clip_stack;
     struct d2d_layer_stack layer_stack;
 
     struct d2d_indexed_objects vertex_buffers;
@@ -458,6 +458,8 @@ struct d2d_bitmap
     float dpi_x;
     float dpi_y;
     D2D1_BITMAP_OPTIONS options;
+
+    struct d2d_clip_stack clip_stack;
 };
 
 HRESULT d2d_bitmap_create(struct d2d_device_context *context, D2D1_SIZE_U size, const void *src_data,
