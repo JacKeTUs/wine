@@ -1506,6 +1506,9 @@ static void d2d_device_context_draw_glyph_run_bitmap(struct d2d_device_context *
         goto done;
     }
 
+    d2d_rect_set(&run_rect, bounds.left / scale_x, bounds.top / scale_y,
+            bounds.right / scale_x, bounds.bottom / scale_y);
+
     brush_desc.opacity = 1.0f;
     brush_desc.transform._11 = 1.0f;
     brush_desc.transform._12 = 0.0f;
