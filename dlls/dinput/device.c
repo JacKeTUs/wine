@@ -2146,7 +2146,20 @@ void dinput_device_init( struct dinput_device *device, const struct dinput_devic
     device->caps.dwSize = sizeof(DIDEVCAPS);
     device->caps.dwFlags = DIDC_ATTACHED | DIDC_EMULATED;
     device->device_gain = 10000;
-    device->autocenter = DIPROPAUTOCENTER_ON;
+    device->autocenter = DIPROPAUTOCENTER_OFF;
+
+    WCHAR value[16];
+    ULONG len = 0;
+    len = GetEnvironmentVariableW(L"PROTON_ENABLE_AUTOCENTER", value, 16);
+    if (len != 0)
+    {
+        value[len] = 0;
+        if (!wcscmp(value, L"1")) {
+            TRACE("Enabling autocenter due to PROTON_ENABLE_AUTOCENTER");
+            device->autocenter = DIPROPAUTOCENTER_ON;
+        }
+    }
+
     device->force_feedback_state = DIGFFS_STOPPED | DIGFFS_EMPTY;
     InitializeCriticalSectionEx( &device->crit, 0, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO );
     dinput_internal_addref( (device->dinput = dinput) );
