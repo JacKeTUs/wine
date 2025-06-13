@@ -1,1 +1,1 @@
-@ stdcall GameInputCreate(ptr ptr ptr)
+@ stdcall GameInputCreate(ptr)
