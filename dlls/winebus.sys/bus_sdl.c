@@ -1030,7 +1030,7 @@ static void sdl_add_device(unsigned int index)
         /* Overcooked! All You Can Eat only adds controllers with unique serial numbers
          * Prefer keeping serial numbers unique over keeping them consistent across runs */
         pSDL_JoystickGetGUIDString(pSDL_JoystickGetGUID(joystick), guid_str, sizeof(guid_str));
-        snprintf(buffer, sizeof(buffer), "%s.%d", guid_str, index);
+        snprintf(buffer, sizeof(buffer), "%s.%d", guid_str, 0);
         TRACE("Making up serial number for %s: %s\n", product, buffer);
         ntdll_umbstowcs(buffer, strlen(buffer) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
     }
