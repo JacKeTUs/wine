@@ -1029,3 +1029,78 @@ NTSTATUS WINAPI HidP_GetLinkCollectionNodes( HIDP_LINK_COLLECTION_NODE *nodes, U
 
     return HIDP_STATUS_SUCCESS;
 }
+
+
+struct set_all_data_params
+{
+    HIDP_DATA *data;
+    HIDP_DATA *data_end;
+    char *report_buf;
+};
+
+static NTSTATUS set_all_data( const struct hid_value_caps *caps, void *user )
+{
+    struct set_all_data_params *params = user;
+    HIDP_DATA *data = params->data;
+    ULONG index_min, index_max;
+    BYTE index;
+    int i;
+
+    if (!caps->bit_size) return HIDP_STATUS_SUCCESS;
+
+    if (HID_VALUE_CAPS_IS_ARRAY(caps))
+    {
+        return HIDP_STATUS_IS_VALUE_ARRAY;
+    }
+    unsigned char *ptr = (unsigned char *)params->report_buf + caps->start_byte;
+
+    for (; data < params->data_end; data++)
+    {
+        if (data->DataIndex < caps->data_index_min || data->DataIndex > caps->data_index_max)
+            continue;
+
+        USHORT offset = caps->start_bit + (data->DataIndex - caps->data_index_min) * caps->bit_size;
+
+        if (caps->flags & HID_VALUE_CAPS_IS_BUTTON)
+        {
+            // Set or clear the bit
+            if (data->On)
+                ptr[offset / 8] |= (1 << (offset % 8));
+            else
+                ptr[offset / 8] &= ~(1 << (offset % 8));
+        }
+        else
+        {
+            ULONG bit_count = caps->bit_size;
+            if ((bit_count + 7) / 8 > sizeof(data->RawValue)) {
+                return HIDP_STATUS_BUFFER_TOO_SMALL;
+            }
+            copy_bits(ptr, (const void *)&data->RawValue, bit_count, offset);
+        }
+    }
+
+    return HIDP_STATUS_SUCCESS;
+}
+
+NTSTATUS WINAPI HidP_SetData( HIDP_REPORT_TYPE report_type, HIDP_DATA *data, ULONG *data_len,
+                              PHIDP_PREPARSED_DATA preparsed_data, char *report_buf, ULONG report_len )
+{
+    struct set_all_data_params params = {.data = data, .data_end = data + *data_len, .report_buf = report_buf};
+    struct hid_preparsed_data *preparsed = (struct hid_preparsed_data *)preparsed_data;
+    struct caps_filter filter = {.usage_page = USAGE_ANY, .usage = USAGE_ANY};
+    NTSTATUS status;
+    USHORT limit = -1;
+
+    TRACE( "report_type %d, data %p, data_len %p, preparsed_data %p, report_buf %p, report_len %lu.\n",
+           report_type, data, data_len, preparsed_data, report_buf, report_len );
+
+    if (!report_len) return HIDP_STATUS_INVALID_REPORT_LENGTH;
+
+    filter.report_id = report_buf[0];
+    status = enum_value_caps( preparsed, report_type, report_len, &filter, set_all_data, &params, &limit );
+    *data_len = params.data - data;
+    if (status != HIDP_STATUS_SUCCESS) return status;
+
+    if (params.data > params.data_end) return HIDP_STATUS_BUFFER_TOO_SMALL;
+    return HIDP_STATUS_SUCCESS;
+}
