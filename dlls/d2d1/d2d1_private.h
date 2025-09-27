@@ -890,6 +890,27 @@ void d2d_command_list_push_layer(struct d2d_command_list *command_list, const st
         const D2D1_LAYER_PARAMETERS1 *params, ID2D1Layer *layer);
 void d2d_command_list_pop_layer(struct d2d_command_list *command_list);
 
+struct d2d_sprite
+{
+    D2D1_RECT_F destinationRect;
+    D2D1_RECT_U sourceRect;
+    D2D1_COLOR_F color;
+    D2D1_MATRIX_3X2_F transform;
+};
+
+struct d2d_sprite_batch
+{
+    ID2D1SpriteBatch ID2D1SpriteBatch_iface;
+    LONG refcount;
+    ID2D1Factory *factory;
+
+    UINT32 sprite_count;
+    
+    struct d2d_sprite* sprites;
+};
+HRESULT d2d_sprite_batch_create(ID2D1Factory *factory, struct d2d_sprite_batch **sprite_batch);
+struct d2d_sprite_batch *unsafe_impl_from_ID2D1SpriteBatch(ID2D1SpriteBatch *iface);
+
 static inline BOOL d2d_array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
 {
     size_t new_capacity, max_capacity;
