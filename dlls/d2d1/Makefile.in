@@ -19,4 +19,5 @@ SOURCES = \
 	state_block.c \
 	stroke.c \
 	version.rc \
-	wic_render_target.c
+	wic_render_target.c \
+	sprite_batch.c

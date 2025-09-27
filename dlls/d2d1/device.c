@@ -2798,18 +2798,76 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateTransformedImageSource
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSpriteBatch(ID2D1DeviceContext6 *iface,
         ID2D1SpriteBatch **sprite_batch)
 {
-    FIXME("iface %p, sprite_batch %p stub!\n", iface, sprite_batch);
+    TRACE("iface %p, sprite_batch %p\n", iface, sprite_batch);
 
-    return E_NOTIMPL;
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    struct d2d_sprite_batch *object;
+    HRESULT hr;
+
+    if (SUCCEEDED(hr = d2d_sprite_batch_create(context->factory, &object)))
+        *sprite_batch = &object->ID2D1SpriteBatch_iface;
+
+    return hr;
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceContext6 *iface,
         ID2D1SpriteBatch *sprite_batch, UINT32 start_index, UINT32 sprite_count, ID2D1Bitmap *bitmap,
         D2D1_BITMAP_INTERPOLATION_MODE interpolation_mode, D2D1_SPRITE_OPTIONS sprite_options)
 {
-    FIXME("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
-            "sprite_options %u stub!\n", iface, sprite_batch, start_index, sprite_count, bitmap,
+    TRACE("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
+            "sprite_options %u\n", iface, sprite_batch, start_index, sprite_count, bitmap,
             interpolation_mode, sprite_options);
+    
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
+    TRACE("context %p, batch %p\n", context, batch);
+    
+    if (!batch || !bitmap) return;
+    
+    TRACE("Sprite count is %d.\n", sprite_count);
+    TRACE("Sprite count in batch is %d.\n", batch->sprite_count);
+
+    if (start_index + sprite_count > batch->sprite_count) {
+        WARN("Start index %d + sprite_count %d is greater than batch->sprite_count %d\n", start_index, sprite_count, batch->sprite_count);
+        return;
+    }
+
+    TRACE("Drawing %u sprites from batch.\n", sprite_count);
+
+    D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
+    TRACE("Antialiased mode now: %#x\n", old_mode);
+    d2d_device_context_SetAntialiasMode(iface, D2D1_ANTIALIAS_MODE_ALIASED);
+    /* Iterate over the sprites */
+    for (UINT32 i = start_index; i < start_index + sprite_count; i++)
+    {
+        TRACE("Drawing %u sprite from batch.\n", i+1);
+
+        // Basically need to draw our bitmap into dst,src from batch, with opacity in color (no color mult for now) and transforming
+        // For now ignore interpolation mode or other sprite options.
+
+        // Not so efficient, because we always clip from InfiniteMatrix and transform our rect from identity.
+        D2D1_RECT_F dst = batch->sprites[i].destinationRect;
+
+
+        D2D1_MATRIX_3X2_F prev_tr;
+        d2d_device_context_GetTransform(iface,&prev_tr);
+        d2d_device_context_SetTransform(iface, &batch->sprites[i].transform);
+
+        D2D1_RECT_F src_rect_f;
+        src_rect_f.left   = (FLOAT)batch->sprites[i].sourceRect.left;
+        src_rect_f.top    = (FLOAT)batch->sprites[i].sourceRect.top;
+        src_rect_f.right  = (FLOAT)batch->sprites[i].sourceRect.right;
+        src_rect_f.bottom = (FLOAT)batch->sprites[i].sourceRect.bottom;
+
+        context->target.bitmap->is_tinted = TRUE;
+        context->target.bitmap->tint_colour = batch->sprites[i].color;
+        d2d_device_context_DrawBitmap(iface, bitmap, &dst, context->target.bitmap->tint_colour.a, interpolation_mode, &src_rect_f);
+        context->target.bitmap->is_tinted = FALSE;
+
+        d2d_device_context_SetTransform(iface, &prev_tr);
+    }
+
+    d2d_device_context_SetAntialiasMode(iface, old_mode);
 }
 
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSvgGlyphStyle(ID2D1DeviceContext6 *iface,
