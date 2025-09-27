@@ -1575,13 +1575,13 @@ static HRESULT hid_joystick_device_try_open( const WCHAR *path, HANDLE *device, 
 
     instance->guidInstance = hid_joystick_guid;
     DWORD crc = 0;
-    crc = RtlComputeCrc32(crc, instance->tszInstanceName, wcslen(instance->tszInstanceName) * sizeof(WCHAR));
-    crc = RtlComputeCrc32(crc, instance->tszProductName, wcslen(instance->tszProductName) * sizeof(WCHAR));
+    crc = RtlComputeCrc32(crc, (const BYTE *)instance->tszInstanceName, wcslen(instance->tszInstanceName) * sizeof(WCHAR));
+    crc = RtlComputeCrc32(crc, (const BYTE *)instance->tszProductName, wcslen(instance->tszProductName) * sizeof(WCHAR));
     WCHAR serial[MAX_PATH];
     memset(serial, 0, sizeof(serial));
 
     if (HidD_GetSerialNumberString( device_file, serial, MAX_PATH * sizeof(WCHAR) )) {
-        crc = RtlComputeCrc32(crc, serial, wcslen(serial) * sizeof(WCHAR));
+        crc = RtlComputeCrc32(crc, (const BYTE *)serial, wcslen(serial) * sizeof(WCHAR));
     } else {
         WARN("Couldn't get serial number\n");
     }
