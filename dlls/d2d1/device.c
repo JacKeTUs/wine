@@ -121,7 +121,7 @@ static void d2d_layer_stack_cleanup(struct d2d_layer_stack *stack)
     stack->count = 0;
 }
 
-static BOOL d2d_layer_stack_push(struct d2d_layer_stack *stack, const struct d2d_layer **entry)
+static BOOL d2d_layer_stack_push(struct d2d_layer_stack *stack, struct d2d_layer **entry)
 {
     struct d2d_layer *e;
     if (!entry)
