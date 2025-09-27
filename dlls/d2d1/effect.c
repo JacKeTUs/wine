@@ -1902,7 +1902,6 @@ static HRESULT STDMETHODCALLTYPE d2d_effect_QueryInterface(ID2D1Effect *iface, R
     {
         ID2D1Image_AddRef(&effect->ID2D1Image_iface);
         *out = &effect->ID2D1Image_iface;
-        return S_OK;
     }
 
     WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
