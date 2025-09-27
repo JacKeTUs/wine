@@ -64,6 +64,8 @@ static ULONG STDMETHODCALLTYPE d2d_layer_Release(ID2D1Layer *iface)
     if (!refcount)
     {
         ID2D1Factory_Release(layer->factory);
+        ID2D1Image_Release(layer->prev_target);
+        ID2D1Bitmap1_Release(layer->offscreen_bitmap);
         free(layer);
     }
 
@@ -112,4 +114,12 @@ HRESULT d2d_layer_create(ID2D1Factory *factory, const D2D1_SIZE_F *size, struct 
     TRACE("Created layer %p.\n", *layer);
 
     return S_OK;
+}
+
+struct d2d_layer *unsafe_impl_from_ID2D1Layer(ID2D1Layer *iface)
+{
+    if (!iface)
+        return NULL;
+    assert(iface->lpVtbl == (ID2D1LayerVtbl *)&d2d_layer_vtbl);
+    return CONTAINING_RECORD(iface, struct d2d_layer, ID2D1Layer_iface);
 }
