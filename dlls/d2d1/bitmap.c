@@ -21,10 +21,29 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(d2d);
 
+#define INITIAL_CLIP_STACK_SIZE 4
+
 static inline struct d2d_bitmap *impl_from_ID2D1Bitmap1(ID2D1Bitmap1 *iface)
 {
     return CONTAINING_RECORD(iface, struct d2d_bitmap, ID2D1Bitmap1_iface);
 }
+
+static BOOL d2d_clip_stack_init(struct d2d_clip_stack *stack)
+{
+    if (!(stack->stack = malloc(INITIAL_CLIP_STACK_SIZE * sizeof(*stack->stack))))
+        return FALSE;
+
+    stack->size = INITIAL_CLIP_STACK_SIZE;
+    stack->count = 0;
+
+    return TRUE;
+}
+
+static void d2d_clip_stack_cleanup(struct d2d_clip_stack *stack)
+{
+    free(stack->stack);
+}
+
 
 static HRESULT d2d_bitmap_unmap(struct d2d_bitmap *bitmap)
 {
@@ -85,6 +104,8 @@ static ULONG STDMETHODCALLTYPE d2d_bitmap_Release(ID2D1Bitmap1 *iface)
 
     if (!refcount)
     {
+        d2d_clip_stack_cleanup(&bitmap->clip_stack);
+
         if (bitmap->srv)
             ID3D11ShaderResourceView_Release(bitmap->srv);
         if (bitmap->rtv)
@@ -400,6 +421,10 @@ static void d2d_bitmap_init(struct d2d_bitmap *bitmap, struct d2d_device_context
     {
         bitmap->dpi_x = 96.0f;
         bitmap->dpi_y = 96.0f;
+    }
+    if (!d2d_clip_stack_init(&bitmap->clip_stack))
+    {
+        WARN("Failed to initialize clip stack.\n");
     }
 }
 
