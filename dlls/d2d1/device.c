@@ -816,12 +816,13 @@ static HRESULT d2d_device_context_update_ps_cb(struct d2d_device_context *contex
     cb_data = map_desc.pData;
     cb_data->outline = outline;
     cb_data->is_arc = is_arc;
-    cb_data->pad[0] = 0;
-    cb_data->pad[1] = 0;
+    cb_data->is_tinted = context->target.bitmap->is_tinted;
+    cb_data->pad = 0;
     if (!d2d_brush_fill_cb(brush, &cb_data->colour_brush))
         WARN("Failed to initialize colour brush buffer.\n");
     if (!d2d_brush_fill_cb(opacity_brush, &cb_data->opacity_brush))
         WARN("Failed to initialize opacity brush buffer.\n");
+    cb_data->tint_colour = context->target.bitmap->tint_colour;
 
     ID3D11DeviceContext_Unmap(d3d_context, (ID3D11Resource *)context->ps_cb, 0);
     ID3D11DeviceContext_Release(d3d_context);
@@ -1649,7 +1650,7 @@ static void STDMETHODCALLTYPE d2d_device_context_SetTransform(ID2D1DeviceContext
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
 
-    TRACE("iface %p, transform %p.\n", iface, transform);
+    TRACE("iface %p, transform %p matrix %s.\n", iface, transform, debug_d2d_matrix3x2_f(transform));
 
     if (context->target.type == D2D_TARGET_COMMAND_LIST)
         d2d_command_list_set_transform(context->target.command_list, transform);
@@ -1665,6 +1666,8 @@ static void STDMETHODCALLTYPE d2d_device_context_GetTransform(ID2D1DeviceContext
     TRACE("iface %p, transform %p.\n", iface, transform);
 
     *transform = render_target->drawing_state.transform;
+
+   TRACE("current transform matrix %s\n", debug_d2d_matrix3x2_f(transform));
 }
 
 static void STDMETHODCALLTYPE d2d_device_context_SetAntialiasMode(ID2D1DeviceContext6 *iface,
@@ -2613,6 +2616,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     ID2D1Bitmap *bitmap;
+    ID2D1Effect *effect;
 
     TRACE("iface %p, image %p, target_offset %s, image_rect %s, interpolation_mode %#x, composite_mode %#x.\n",
             iface, image, debug_d2d_point_2f(target_offset), debug_d2d_rect_f(image_rect),
@@ -2627,6 +2631,38 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
 
     if (composite_mode != D2D1_COMPOSITE_MODE_SOURCE_OVER)
         FIXME("Unhandled composite mode %#x.\n", composite_mode);
+
+    if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Effect, (void **)&effect)))
+    {
+        TRACE("HACK: ID2D1Effect %p passed as parameter to DrawImage. For now draw just first input.\n", effect);
+        TRACE("Effect count: %d\n", ID2D1Effect_GetInputCount(effect));
+        ID2D1Image *effect_image = NULL;
+        if (ID2D1Effect_GetInputCount(effect) == 1) {
+            ID2D1Effect_GetInput(effect, 0, &effect_image);
+            if (effect_image) {
+                if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
+                {
+                    struct d2d_effect* effect_context = unsafe_impl_from_ID2D1Effect(effect);
+                    if (effect_context && IsEqualCLSID(&effect_context->effect_id, &CLSID_D2D1Tint)) {
+                        TRACE("Tint effect! Lets draw it with tint\n");
+                        //ID2D1Effect_GetValue(effect, 0, D2D1_PROPERTY_TYPE_VECTOR4, (BYTE*)&context->target.bitmap->tint_colour, sizeof(D2D1_COLOR_F));
+                        //context->target.bitmap->is_tinted = TRUE;
+                    }
+                    d2d_device_context_draw_bitmap(context, bitmap, NULL, 1.0f, interpolation_mode, image_rect, target_offset, NULL);
+                    if (effect_context && IsEqualCLSID(&effect_context->effect_id, &CLSID_D2D1Tint)) {
+                        //context->target.bitmap->is_tinted = FALSE;
+                    }
+
+                    ID2D1Bitmap_Release(bitmap);
+                } else {
+                    ERR("Effect input image is not a bitmap, can't draw\n");
+                }
+                ID2D1Image_Release(effect_image);
+            }
+        }
+        ID2D1Effect_Release(effect);
+        return;
+    }
 
     if (SUCCEEDED(ID2D1Image_QueryInterface(image, &IID_ID2D1Bitmap, (void **)&bitmap)))
     {
@@ -4110,12 +4146,14 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         "\n"
         "bool outline;\n"
         "bool is_arc;\n"
+        "bool is_tinted;\n"
         "struct brush\n"
         "{\n"
         "    uint type;\n"
         "    float opacity;\n"
         "    float4 data[3];\n"
         "} colour_brush, opacity_brush;\n"
+        "float4 tint_colour;\n"
         "\n"
         "SamplerState s0, s1;\n"
         "Texture2D t0, t1;\n"
@@ -4244,6 +4282,8 @@ static HRESULT d2d_device_context_init(struct d2d_device_context *render_target,
         "    float4 colour;\n"
         "\n"
         "    colour = sample_brush(colour_brush, t0, s0, b0, i.p);\n"
+        "    if (is_tinted)\n"
+        "        colour *= tint_colour;\n"
         "    if (opacity_brush.type < BRUSH_TYPE_COUNT)\n"
         "        colour *= sample_brush(opacity_brush, t1, s1, b1, i.p).a;\n"
         "\n"

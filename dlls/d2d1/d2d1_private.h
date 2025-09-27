@@ -127,9 +127,11 @@ struct d2d_ps_cb
 {
     BOOL outline;
     BOOL is_arc;
-    BOOL pad[2];
+    BOOL is_tinted;
+    BOOL pad;
     struct d2d_brush_cb colour_brush;
     struct d2d_brush_cb opacity_brush;
+    D2D1_COLOR_F tint_colour;
 };
 
 struct d2d_vec4
@@ -455,6 +457,8 @@ struct d2d_bitmap
     D2D1_BITMAP_OPTIONS options;
 
     struct d2d_clip_stack clip_stack;
+    BOOL is_tinted;
+    D2D1_COLOR_F tint_colour;
 };
 
 HRESULT d2d_bitmap_create(struct d2d_device_context *context, D2D1_SIZE_U size, const void *src_data,
@@ -810,8 +814,11 @@ struct d2d_effect
     struct d2d_effect_context *effect_context;
     struct d2d_transform_graph *graph;
     ID2D1Image **inputs;
+    ID2D1Image *output;
     size_t inputs_size;
     size_t input_count;
+
+    CLSID effect_id;
 };
 
 HRESULT d2d_effect_create(struct d2d_device_context *context, const CLSID *effect_id,
@@ -827,6 +834,7 @@ void d2d_effect_properties_cleanup(struct d2d_effect_properties *props);
 HRESULT d2d_factory_register_builtin_effect(struct d2d_factory *factory, REFCLSID effect_id,
         const WCHAR *property_xml, const D2D1_PROPERTY_BINDING *bindings, UINT32 binding_count,
         PD2D1_EFFECT_FACTORY effect_factory);
+struct d2d_effect *unsafe_impl_from_ID2D1Effect(ID2D1Effect *iface);
 
 struct d2d_vertex_buffer
 {
