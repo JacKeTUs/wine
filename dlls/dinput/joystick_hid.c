@@ -1791,6 +1791,30 @@ static HRESULT hid_joystick_device_open( int index, const GUID *guid, DIDEVICEIN
     return DI_OK;
 }
 
+
+HRESULT hid_joystick_find_device( struct dinput *dinput, const GUID *rguidClass, const WCHAR * ptszname, GUID **out ) {
+
+    HIDD_ATTRIBUTES attrs = {.Size = sizeof(attrs)};
+    PHIDP_PREPARSED_DATA preparsed;
+    WCHAR device_path[MAX_PATH];
+    GUID guid = GUID_NULL;
+    HIDP_CAPS caps;
+    HANDLE device;
+    HRESULT hr;
+    DIDEVICEINSTANCEW instance = {.dwSize = sizeof(DIDEVICEINSTANCEW)};
+
+    hr = hid_joystick_device_try_open( ptszname, &device, &preparsed,
+                                    &attrs, &caps, &instance, dinput->dwVersion );
+    TRACE("try_open result: %#lx; guid is %s", hr, debugstr_guid( &instance.guidInstance ));
+    if (hr == S_OK) {
+        **out = instance.guidInstance;
+        CloseHandle( device );
+        HidD_FreePreparsedData( preparsed );
+    }
+    return hr;
+}
+
+
 HRESULT hid_joystick_enum_device( DWORD type, DWORD flags, DIDEVICEINSTANCEW *instance, DWORD version, int index )
 {
     HIDD_ATTRIBUTES attrs = {.Size = sizeof(attrs)};
