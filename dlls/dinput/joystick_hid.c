@@ -1546,6 +1546,9 @@ static HRESULT hid_joystick_device_try_open( const WCHAR *path, HANDLE *device, 
     NTSTATUS status;
     UINT32 handle;
     USHORT count;
+    DWORD crc = 0;
+    WCHAR serial[MAX_PATH];
+
 
     device_file = CreateFileW( path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING, 0 );
@@ -1574,10 +1577,8 @@ static HRESULT hid_joystick_device_try_open( const WCHAR *path, HANDLE *device, 
     }
 
     instance->guidInstance = hid_joystick_guid;
-    DWORD crc = 0;
     crc = RtlComputeCrc32(crc, (const BYTE *)instance->tszInstanceName, wcslen(instance->tszInstanceName) * sizeof(WCHAR));
     crc = RtlComputeCrc32(crc, (const BYTE *)instance->tszProductName, wcslen(instance->tszProductName) * sizeof(WCHAR));
-    WCHAR serial[MAX_PATH];
     memset(serial, 0, sizeof(serial));
 
     if (HidD_GetSerialNumberString( device_file, serial, MAX_PATH * sizeof(WCHAR) )) {
@@ -1796,8 +1797,6 @@ HRESULT hid_joystick_find_device( struct dinput *dinput, const GUID *rguidClass,
 
     HIDD_ATTRIBUTES attrs = {.Size = sizeof(attrs)};
     PHIDP_PREPARSED_DATA preparsed;
-    WCHAR device_path[MAX_PATH];
-    GUID guid = GUID_NULL;
     HIDP_CAPS caps;
     HANDLE device;
     HRESULT hr;

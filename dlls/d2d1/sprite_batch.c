@@ -90,6 +90,17 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
             UINT32 transformsStride)
 {
     struct d2d_sprite_batch *batch = impl_from_ID2D1SpriteBatch(iface);
+    UINT32 new_sprite_count = 0;
+    struct d2d_sprite* new_sprites;
+
+    D2D1_RECT_U inf = {0,0,UINT_MAX,UINT_MAX};
+    D2D1_COLOR_F color1={1.0f,1.0f,1.0f,1.0f};
+    D2D1_MATRIX_3X2_F identity =
+                                {{{
+                                    1.0f, 0.0f,
+                                    0.0f, 1.0f,
+                                    0.0f, 0.0f,
+                                }}};
 
     TRACE("iface %p, batch %p, spriteCount %d, d %p, s %p, c %p, t %p, %d, %d, %d, %d\n", iface, batch, spriteCount, destinationRects, \
             sourceRects, colors, transforms, destinationRectanglesStride, sourceRectanglesStride, colorsStride, transformsStride);
@@ -100,24 +111,13 @@ static HRESULT STDMETHODCALLTYPE d2d_sprite_batch_AddSprites(ID2D1SpriteBatch *i
     }
 
     /* Expand storage if needed */
-    UINT32 new_sprite_count = batch->sprite_count + spriteCount;
+    new_sprite_count = batch->sprite_count + spriteCount;
     
-    struct d2d_sprite* new_sprites = realloc(batch->sprites, new_sprite_count*sizeof(struct d2d_sprite));
+    new_sprites = realloc(batch->sprites, new_sprite_count*sizeof(struct d2d_sprite));
     if (!new_sprites)
         return E_OUTOFMEMORY;
     batch->sprites = new_sprites;
     
-    // "Zero" new sprite
-    D2D1_RECT_U inf = {0,0,UINT_MAX,UINT_MAX};
-
-    D2D1_COLOR_F color1={1.0f,1.0f,1.0f,1.0f};
-    D2D1_MATRIX_3X2_F identity =
-                                {{{
-                                    1.0f, 0.0f,
-                                    0.0f, 1.0f,
-                                    0.0f, 0.0f,
-                                }}};
-                                
     /* Not efficient in memory, but most simple approach for now */
     for (UINT32 i = batch->sprite_count; i < new_sprite_count; i++) {
 

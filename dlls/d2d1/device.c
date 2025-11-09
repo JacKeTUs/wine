@@ -169,6 +169,8 @@ static void d2d_device_context_draw(struct d2d_device_context *render_target, en
     D3D11_RECT scissor_rect;
     unsigned int offset;
     D3D11_VIEWPORT vp;
+    struct d2d_clip_stack* clip_stack;
+    const D2D1_RECT_F *clip_rect;
 
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
@@ -194,12 +196,10 @@ static void d2d_device_context_draw(struct d2d_device_context *render_target, en
     ID3D11DeviceContext1_PSSetShader(context, render_target->ps, NULL, 0);
     ID3D11DeviceContext1_RSSetViewports(context, 1, &vp);
 
-    struct d2d_clip_stack* clip_stack;
     clip_stack = d2d_return_target_clip_stack(render_target);
     if (clip_stack && clip_stack->count)
     {
         TRACE("Draw - active clip!\n");
-        const D2D1_RECT_F *clip_rect;
 
         clip_rect = &clip_stack->stack[clip_stack->count - 1];
         scissor_rect.left = ceilf(clip_rect->left - 0.5f);
@@ -1778,10 +1778,11 @@ static void STDMETHODCALLTYPE d2d_device_context_PushLayer(ID2D1DeviceContext6 *
         const D2D1_LAYER_PARAMETERS *layer_parameters, ID2D1Layer *layer)
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    D2D1_LAYER_PARAMETERS1 parameters;
+
 
     TRACE("iface %p, layer_parameters %p, layer %p stub!\n", iface, layer_parameters, layer);
 
-    D2D1_LAYER_PARAMETERS1 parameters;
     memcpy(&parameters, layer_parameters, sizeof(*layer_parameters));
     parameters.layerOptions = D2D1_LAYER_OPTIONS1_NONE;
 
@@ -2617,6 +2618,9 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     ID2D1Bitmap *bitmap;
     ID2D1Effect *effect;
+    ID2D1Image *effect_image = NULL;
+    struct d2d_effect* effect_context;
+
 
     TRACE("iface %p, image %p, target_offset %s, image_rect %s, interpolation_mode %#x, composite_mode %#x.\n",
             iface, image, debug_d2d_point_2f(target_offset), debug_d2d_rect_f(image_rect),
@@ -2636,13 +2640,12 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawImage(ID2D1DeviceContext6 *
     {
         TRACE("HACK: ID2D1Effect %p passed as parameter to DrawImage. For now draw just first input.\n", effect);
         TRACE("Effect count: %d\n", ID2D1Effect_GetInputCount(effect));
-        ID2D1Image *effect_image = NULL;
         if (ID2D1Effect_GetInputCount(effect) == 1) {
             ID2D1Effect_GetInput(effect, 0, &effect_image);
             if (effect_image) {
                 if (SUCCEEDED(ID2D1Image_QueryInterface(effect_image, &IID_ID2D1Bitmap, (void **)&bitmap)))
                 {
-                    struct d2d_effect* effect_context = unsafe_impl_from_ID2D1Effect(effect);
+                    effect_context = unsafe_impl_from_ID2D1Effect(effect);
                     if (effect_context && IsEqualCLSID(&effect_context->effect_id, &CLSID_D2D1Tint)) {
                         TRACE("Tint effect! Lets draw it with tint\n");
                         //ID2D1Effect_GetValue(effect, 0, D2D1_PROPERTY_TYPE_VECTOR4, (BYTE*)&context->target.bitmap->tint_colour, sizeof(D2D1_COLOR_F));
@@ -2883,12 +2886,14 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateTransformedImageSource
 static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateSpriteBatch(ID2D1DeviceContext6 *iface,
         ID2D1SpriteBatch **sprite_batch)
 {
-    TRACE("iface %p, sprite_batch %p\n", iface, sprite_batch);
 
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     struct d2d_sprite_batch *object;
     HRESULT hr;
 
+    TRACE("iface %p, sprite_batch %p\n", iface, sprite_batch);
+    
+    
     if (SUCCEEDED(hr = d2d_sprite_batch_create(context->factory, &object)))
         *sprite_batch = &object->ID2D1SpriteBatch_iface;
 
@@ -2899,12 +2904,19 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         ID2D1SpriteBatch *sprite_batch, UINT32 start_index, UINT32 sprite_count, ID2D1Bitmap *bitmap,
         D2D1_BITMAP_INTERPOLATION_MODE interpolation_mode, D2D1_SPRITE_OPTIONS sprite_options)
 {
+    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
+    struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
+
+    D2D1_ANTIALIAS_MODE old_mode;
+    D2D1_RECT_F dst;
+    D2D1_MATRIX_3X2_F prev_tr;
+    D2D1_RECT_F src_rect_f;
+
+
+
     TRACE("iface %p, sprite_batch %p, start_index %u, sprite_count %u, bitmap %p, interpolation_mode %u,"
             "sprite_options %u\n", iface, sprite_batch, start_index, sprite_count, bitmap,
             interpolation_mode, sprite_options);
-    
-    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
-    struct d2d_sprite_batch *batch = unsafe_impl_from_ID2D1SpriteBatch(sprite_batch);
     TRACE("context %p, batch %p\n", context, batch);
     
     if (!batch || !bitmap) return;
@@ -2919,7 +2931,7 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
 
     TRACE("Drawing %u sprites from batch.\n", sprite_count);
 
-    D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
+    old_mode = d2d_device_context_GetAntialiasMode(iface);
     TRACE("Antialiased mode now: %#x\n", old_mode);
     d2d_device_context_SetAntialiasMode(iface, D2D1_ANTIALIAS_MODE_ALIASED);
     /* Iterate over the sprites */
@@ -2931,14 +2943,12 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawSpriteBatch(ID2D1DeviceCont
         // For now ignore interpolation mode or other sprite options.
 
         // Not so efficient, because we always clip from InfiniteMatrix and transform our rect from identity.
-        D2D1_RECT_F dst = batch->sprites[i].destinationRect;
+        dst = batch->sprites[i].destinationRect;
 
 
-        D2D1_MATRIX_3X2_F prev_tr;
         d2d_device_context_GetTransform(iface,&prev_tr);
         d2d_device_context_SetTransform(iface, &batch->sprites[i].transform);
 
-        D2D1_RECT_F src_rect_f;
         src_rect_f.left   = (FLOAT)batch->sprites[i].sourceRect.left;
         src_rect_f.top    = (FLOAT)batch->sprites[i].sourceRect.top;
         src_rect_f.right  = (FLOAT)batch->sprites[i].sourceRect.right;
@@ -3073,13 +3083,22 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     HRESULT hr = S_OK;
+    D2D1_SIZE_F curSize;
+    FLOAT dpiX, dpiY;
+    struct d2d_layer *new_layer;
+    ID2D1Bitmap* current_bitmap_target;
+    D2D1_BITMAP_PROPERTIES1 props;
+    struct d2d_bitmap *bitmap_impl;
+    D2D1_ANTIALIAS_MODE old_mode;
+    D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
 
     if (!layer) {
-        D2D1_SIZE_F curSize = {(FLOAT)context->pixel_size.width, (FLOAT)context->pixel_size.height};
+        curSize.width = (FLOAT)context->pixel_size.width;
+        curSize.height = (FLOAT)context->pixel_size.height;
         d2d_device_context_CreateLayer(iface, &curSize, &layer);
     }
 
-    struct d2d_layer *new_layer = unsafe_impl_from_ID2D1Layer(layer);
+    new_layer = unsafe_impl_from_ID2D1Layer(layer);
     if (!new_layer) {
         ERR("somehow new layer is NULL\n");
     }
@@ -3101,7 +3120,6 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     TRACE("layer maskAntialiasMode\t%d\toptions\t%#x\n",
         new_layer->params.maskAntialiasMode,new_layer->params.layerOptions);
 
-    FLOAT dpiX, dpiY;
     d2d_device_context_GetDpi(iface, &dpiX, &dpiY);
     TRACE("dpi: %f\t%f\n", dpiX,dpiY);
 
@@ -3109,19 +3127,15 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
     d2d_device_context_GetTransform(iface, &new_layer->prev_transform);
     d2d_device_context_GetPixelSize(iface, &new_layer->pixel_size);
 
-    D2D1_BITMAP_PROPERTIES1 props;
-    
     props.dpiX = dpiX;
     props.dpiY = dpiY;
 
     props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
     props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
 
-    ID2D1Bitmap* current_bitmap_target;
     if (SUCCEEDED(ID2D1Image_QueryInterface(new_layer->prev_target, &IID_ID2D1Bitmap, (void **)&current_bitmap_target)))
     {
         TRACE("Current target is bitmap! Copying pixelFormat from there\n");
-        struct d2d_bitmap *bitmap_impl;
 
         bitmap_impl = unsafe_impl_from_ID2D1Bitmap(current_bitmap_target);
         if (bitmap_impl)
@@ -3149,14 +3163,13 @@ static void d2d_device_context_push_layer_impl(ID2D1DeviceContext6 *iface,
         return;
     }
 
-    D2D1_ANTIALIAS_MODE old_mode = d2d_device_context_GetAntialiasMode(iface);
+    old_mode = d2d_device_context_GetAntialiasMode(iface);
     TRACE("Antialiased mode now: %#x\n", old_mode);
     d2d_device_context_SetTarget(iface, (ID2D1Image*)new_layer->offscreen_bitmap);
 
     if (new_layer->params.layerOptions == D2D1_LAYER_OPTIONS1_NONE)
     {
         TRACE("D2D1_LAYER_OPTIONS1_NONE, set transparent black\n");
-        D2D1_COLOR_F transparentBlack = {0, 0, 0, 0};
         d2d_device_context_Clear(iface, &transparentBlack);
     }
 
@@ -3190,6 +3203,19 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 {
     struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
     HRESULT hr = S_OK;
+    struct d2d_layer* top_layer = NULL;
+    D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
+    D2D1_BRUSH_PROPERTIES brush_desc;
+    D2D1_SIZE_F _size;
+    D2D1_RECT_F s, d;
+    D2D1_BITMAP_BRUSH_PROPERTIES1 bitmap_brush_desc;
+    D2D1_SIZE_F size;
+    D2D1_RECT_F size_rect;
+    D2D1_RECT_F destination_bounds;
+    struct d2d_brush *imageBrush;
+    ID2D1Geometry* geometry = NULL;
+    D2D1_MATRIX_3X2_F maskTransform;
+
     TRACE("iface %p\n", iface);
 
     if (context->target.type == D2D_TARGET_UNKNOWN) {
@@ -3201,16 +3227,12 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
         return;
     }
 
-    struct d2d_layer* top_layer = NULL;
     d2d_layer_stack_pop(&context->layer_stack, &top_layer);
     if (!top_layer) {
         ERR("top layer pointer is NULL\n");
         return;
     }
 
-    TRACE("stack size now is %d\n", context->layer_stack.count);
-
-    D2D1_MATRIX_3X2_F current_transform; // we need to restore it later
     d2d_device_context_GetTransform(iface, &current_transform);
     d2d_device_context_SetTarget(iface, top_layer->prev_target);
 
@@ -3221,16 +3243,12 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     TRACE("SetTarget successfull\n");
 
-    struct d2d_brush *imageBrush;
 
     // Set layer opacity to brush properties
-    D2D1_BRUSH_PROPERTIES brush_desc;
     brush_desc.opacity = top_layer->params.opacity;
     brush_desc.transform = identity;
 
     // Copy from draw_bitmap
-    D2D1_SIZE_F _size;
-    D2D1_RECT_F s, d;
     _size = ID2D1Bitmap1_GetSize(top_layer->offscreen_bitmap);
     d2d_rect_set(&s, 0.0f, 0.0f, _size.width, _size.height);
 
@@ -3246,7 +3264,6 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     brush_desc.transform._22 = fabsf((d.bottom - d.top) / (s.bottom - s.top));
     brush_desc.transform._32 = min(d.top, d.bottom) - min(s.top, s.bottom) * brush_desc.transform._22;
 
-    D2D1_BITMAP_BRUSH_PROPERTIES1 bitmap_brush_desc;
     bitmap_brush_desc.extendModeX = D2D1_EXTEND_MODE_CLAMP;
     bitmap_brush_desc.extendModeY = D2D1_EXTEND_MODE_CLAMP;
     bitmap_brush_desc.interpolationMode = 
@@ -3264,9 +3281,6 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
     }
 
     // Apply clip geometry and draw
-    D2D1_SIZE_F size;
-    D2D1_RECT_F size_rect;
-    D2D1_RECT_F destination_bounds;
     size = ID2D1Bitmap1_GetSize(top_layer->offscreen_bitmap);
     d2d_rect_set(&size_rect, 0.0f, 0.0f, size.width, size.height);
     d2d_rect_set(&destination_bounds, 0.0f, 0.0f, size.width, size.height);
@@ -3278,11 +3292,8 @@ static void STDMETHODCALLTYPE d2d_device_context_PopLayer(ID2D1DeviceContext6 *i
 
     //d2d_device_context_PushAxisAlignedClip(iface, &destination_bounds,
     //    top_layer.params.maskAntialiasMode);
-
-    ID2D1Geometry* geometry = NULL;
-
     if (top_layer->params.geometricMask) {
-        D2D1_MATRIX_3X2_F maskTransform = top_layer->params.maskTransform;
+        maskTransform = top_layer->params.maskTransform;
         TRACE("maskTransform: %s\n", debug_d2d_matrix3x2_f(&maskTransform));
         d2d_matrix_multiply(&maskTransform, &top_layer->prev_transform);
         hr = ID2D1Factory_CreateTransformedGeometry(context->factory,

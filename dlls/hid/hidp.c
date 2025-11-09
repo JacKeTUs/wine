@@ -1042,24 +1042,24 @@ static NTSTATUS set_all_data( const struct hid_value_caps *caps, void *user )
 {
     struct set_all_data_params *params = user;
     HIDP_DATA *data = params->data;
-    ULONG index_min, index_max;
-    BYTE index;
-    int i;
+    unsigned char *ptr;
+    USHORT offset;
+    ULONG bit_count;
 
     if (!caps->bit_size) return HIDP_STATUS_SUCCESS;
-
+    
     if (HID_VALUE_CAPS_IS_ARRAY(caps))
     {
         return HIDP_STATUS_IS_VALUE_ARRAY;
     }
-    unsigned char *ptr = (unsigned char *)params->report_buf + caps->start_byte;
+    ptr = (unsigned char *)params->report_buf + caps->start_byte;
 
     for (; data < params->data_end; data++)
     {
         if (data->DataIndex < caps->data_index_min || data->DataIndex > caps->data_index_max)
             continue;
 
-        USHORT offset = caps->start_bit + (data->DataIndex - caps->data_index_min) * caps->bit_size;
+        offset = caps->start_bit + (data->DataIndex - caps->data_index_min) * caps->bit_size;
 
         if (caps->flags & HID_VALUE_CAPS_IS_BUTTON)
         {
@@ -1071,7 +1071,7 @@ static NTSTATUS set_all_data( const struct hid_value_caps *caps, void *user )
         }
         else
         {
-            ULONG bit_count = caps->bit_size;
+            bit_count = caps->bit_size;
             if ((bit_count + 7) / 8 > sizeof(data->RawValue)) {
                 return HIDP_STATUS_BUFFER_TOO_SMALL;
             }
